@@ -1,0 +1,436 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1216</width>
+    <height>680</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>MainWindow</string>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <widget class="QLabel" name="label">
+    <property name="geometry">
+     <rect>
+      <x>16</x>
+      <y>16</y>
+      <width>72</width>
+      <height>32</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <family>楷体</family>
+      <pointsize>16</pointsize>
+     </font>
+    </property>
+    <property name="text">
+     <string>环境</string>
+    </property>
+   </widget>
+   <widget class="QLabel" name="label_2">
+    <property name="geometry">
+     <rect>
+      <x>16</x>
+      <y>80</y>
+      <width>96</width>
+      <height>20</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <family>楷体</family>
+      <pointsize>12</pointsize>
+     </font>
+    </property>
+    <property name="text">
+     <string>操作系统</string>
+    </property>
+   </widget>
+   <widget class="QLineEdit" name="lineEdit_OS">
+    <property name="geometry">
+     <rect>
+      <x>112</x>
+      <y>72</y>
+      <width>160</width>
+      <height>32</height>
+     </rect>
+    </property>
+   </widget>
+   <widget class="QLabel" name="label_3">
+    <property name="geometry">
+     <rect>
+      <x>16</x>
+      <y>128</y>
+      <width>96</width>
+      <height>20</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <family>楷体</family>
+      <pointsize>12</pointsize>
+     </font>
+    </property>
+    <property name="text">
+     <string>软件环境</string>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="pushButton_AddEnvLine">
+    <property name="geometry">
+     <rect>
+      <x>16</x>
+      <y>304</y>
+      <width>80</width>
+      <height>24</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>添加行</string>
+    </property>
+   </widget>
+   <widget class="QTableView" name="tableView_Env">
+    <property name="geometry">
+     <rect>
+      <x>16</x>
+      <y>160</y>
+      <width>256</width>
+      <height>128</height>
+     </rect>
+    </property>
+   </widget>
+   <widget class="QLabel" name="label_4">
+    <property name="geometry">
+     <rect>
+      <x>16</x>
+      <y>352</y>
+      <width>128</width>
+      <height>32</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <family>楷体</family>
+      <pointsize>16</pointsize>
+     </font>
+    </property>
+    <property name="text">
+     <string>操作</string>
+    </property>
+   </widget>
+   <widget class="QTabWidget" name="tabWidget">
+    <property name="geometry">
+     <rect>
+      <x>16</x>
+      <y>384</y>
+      <width>256</width>
+      <height>224</height>
+     </rect>
+    </property>
+    <property name="currentIndex">
+     <number>1</number>
+    </property>
+    <widget class="QWidget" name="tab">
+     <attribute name="title">
+      <string>安装</string>
+     </attribute>
+     <widget class="QLabel" name="label_5">
+      <property name="geometry">
+       <rect>
+        <x>16</x>
+        <y>15</y>
+        <width>80</width>
+        <height>24</height>
+       </rect>
+      </property>
+      <property name="font">
+       <font>
+        <family>楷体</family>
+        <pointsize>12</pointsize>
+       </font>
+      </property>
+      <property name="text">
+       <string>软件名</string>
+      </property>
+     </widget>
+     <widget class="QLineEdit" name="lineEdit_Install">
+      <property name="geometry">
+       <rect>
+        <x>16</x>
+        <y>48</y>
+        <width>208</width>
+        <height>32</height>
+       </rect>
+      </property>
+     </widget>
+     <widget class="QPushButton" name="pushButton_Install">
+      <property name="geometry">
+       <rect>
+        <x>80</x>
+        <y>96</y>
+        <width>96</width>
+        <height>32</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>确定</string>
+      </property>
+     </widget>
+    </widget>
+    <widget class="QWidget" name="tab_2">
+     <attribute name="title">
+      <string>配置</string>
+     </attribute>
+     <widget class="QLabel" name="label_6">
+      <property name="geometry">
+       <rect>
+        <x>16</x>
+        <y>16</y>
+        <width>64</width>
+        <height>24</height>
+       </rect>
+      </property>
+      <property name="font">
+       <font>
+        <family>楷体</family>
+        <pointsize>12</pointsize>
+       </font>
+      </property>
+      <property name="text">
+       <string>软件名</string>
+      </property>
+     </widget>
+     <widget class="QLineEdit" name="lineEdit_CfName">
+      <property name="geometry">
+       <rect>
+        <x>80</x>
+        <y>12</y>
+        <width>144</width>
+        <height>32</height>
+       </rect>
+      </property>
+     </widget>
+     <widget class="QLabel" name="label_7">
+      <property name="geometry">
+       <rect>
+        <x>16</x>
+        <y>64</y>
+        <width>64</width>
+        <height>24</height>
+       </rect>
+      </property>
+      <property name="font">
+       <font>
+        <family>楷体</family>
+        <pointsize>12</pointsize>
+       </font>
+      </property>
+      <property name="text">
+       <string>路径</string>
+      </property>
+     </widget>
+     <widget class="QLineEdit" name="lineEdit_CfPth">
+      <property name="geometry">
+       <rect>
+        <x>80</x>
+        <y>60</y>
+        <width>144</width>
+        <height>32</height>
+       </rect>
+      </property>
+     </widget>
+     <widget class="QLabel" name="label_8">
+      <property name="geometry">
+       <rect>
+        <x>16</x>
+        <y>112</y>
+        <width>64</width>
+        <height>24</height>
+       </rect>
+      </property>
+      <property name="font">
+       <font>
+        <family>楷体</family>
+        <pointsize>12</pointsize>
+       </font>
+      </property>
+      <property name="text">
+       <string>描述</string>
+      </property>
+     </widget>
+     <widget class="QLineEdit" name="lineEdit_CfDscp">
+      <property name="geometry">
+       <rect>
+        <x>80</x>
+        <y>108</y>
+        <width>144</width>
+        <height>32</height>
+       </rect>
+      </property>
+     </widget>
+     <widget class="QPushButton" name="pushButton_Conf">
+      <property name="geometry">
+       <rect>
+        <x>80</x>
+        <y>152</y>
+        <width>96</width>
+        <height>32</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>确定</string>
+      </property>
+     </widget>
+    </widget>
+   </widget>
+   <widget class="Line" name="line">
+    <property name="geometry">
+     <rect>
+      <x>288</x>
+      <y>16</y>
+      <width>3</width>
+      <height>632</height>
+     </rect>
+    </property>
+    <property name="orientation">
+     <enum>Qt::Vertical</enum>
+    </property>
+   </widget>
+   <widget class="QLabel" name="label_9">
+    <property name="geometry">
+     <rect>
+      <x>304</x>
+      <y>16</y>
+      <width>128</width>
+      <height>32</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <family>楷体</family>
+      <pointsize>16</pointsize>
+     </font>
+    </property>
+    <property name="text">
+     <string>解析结果</string>
+    </property>
+   </widget>
+   <widget class="QLabel" name="label_rawgpt">
+    <property name="geometry">
+     <rect>
+      <x>304</x>
+      <y>64</y>
+      <width>384</width>
+      <height>20</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <family>楷体</family>
+      <pointsize>12</pointsize>
+      <underline>true</underline>
+     </font>
+    </property>
+    <property name="text">
+     <string>点此查看GPT返回的原始内容</string>
+    </property>
+   </widget>
+   <widget class="QListWidget" name="copt_list">
+    <property name="geometry">
+     <rect>
+      <x>304</x>
+      <y>96</y>
+      <width>432</width>
+      <height>496</height>
+     </rect>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="button_addcmd">
+    <property name="geometry">
+     <rect>
+      <x>364</x>
+      <y>608</y>
+      <width>96</width>
+      <height>32</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>添加指令</string>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="button_cmdexec">
+    <property name="geometry">
+     <rect>
+      <x>550</x>
+      <y>608</y>
+      <width>96</width>
+      <height>32</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>执行</string>
+    </property>
+   </widget>
+   <widget class="Line" name="line_2">
+    <property name="geometry">
+     <rect>
+      <x>752</x>
+      <y>16</y>
+      <width>3</width>
+      <height>632</height>
+     </rect>
+    </property>
+    <property name="orientation">
+     <enum>Qt::Vertical</enum>
+    </property>
+   </widget>
+   <widget class="QLabel" name="label_10">
+    <property name="geometry">
+     <rect>
+      <x>768</x>
+      <y>48</y>
+      <width>128</width>
+      <height>32</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <family>楷体</family>
+      <pointsize>16</pointsize>
+     </font>
+    </property>
+    <property name="text">
+     <string>日志</string>
+    </property>
+   </widget>
+   <widget class="QTextEdit" name="text_log">
+    <property name="geometry">
+     <rect>
+      <x>768</x>
+      <y>96</y>
+      <width>432</width>
+      <height>496</height>
+     </rect>
+    </property>
+   </widget>
+  </widget>
+  <widget class="QMenuBar" name="menubar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>1216</width>
+     <height>25</height>
+    </rect>
+   </property>
+  </widget>
+  <widget class="QStatusBar" name="statusbar"/>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

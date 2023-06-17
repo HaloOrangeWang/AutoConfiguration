@@ -1,0 +1,5 @@
+.idea/
+__pycache__/
+AutoConfigServer/answers/
+TestServer/*.txt
+build-*

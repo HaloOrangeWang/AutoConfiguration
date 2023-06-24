@@ -3,3 +3,4 @@ __pycache__/
 AutoConfigServer/answers/
 TestServer/*.txt
 build-*
+nohup.out

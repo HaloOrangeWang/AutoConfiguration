@@ -62,7 +62,7 @@ async def main():
     app = tornado.web.Application([
         (r"/submit", MainServer, dict(sql_model=sql_model, gpt_client=gpt_client))
     ])
-    app.listen(8000)
+    app.listen(58000, address="0.0.0.0")
     await asyncio.Event().wait()
 
 

@@ -6,7 +6,7 @@ from typing import List
 
 
 MysqlUrl = f"mysql+pymysql://{MYSQL_USER}:{MYSQL_PASSWD}@{MYSQL_HOST}:{MYSQL_PORT}/{MYSQL_DB}"
-Engine = create_engine(MysqlUrl)
+Engine = create_engine(MysqlUrl, pool_recycle=3600)
 Base = declarative_base()
 
 

@@ -69,6 +69,7 @@ void GptComm::send_next_question(std::wstring question_str)
 void GptComm::on_fail(Client* c, websocketpp::connection_hdl hdl)
 {
     // 连接时出错（比如404了），会调用这个函数
+    std::string error_reason = c->get_con_from_hdl(hdl)->get_ec().message();
     emit ReturnErrorMsg(WebSocketError);
     try{
         c->close(hdl, websocketpp::close::status::normal, ""); //出错之后直接关闭连接即可。

@@ -115,6 +115,8 @@ void MainWindow::submit_install_question()
     status = Downloading;
     wait_dialog->show();
     gpt_comm->input_question(question_str);
+    ui->pushButton_Conf->setEnabled(false);
+    ui->pushButton_Install->setEnabled(false);
 }
 
 void MainWindow::submit_config_question()
@@ -146,6 +148,8 @@ void MainWindow::submit_config_question()
     status = Downloading;
     wait_dialog->show();
     gpt_comm->input_question(question_str);
+    ui->pushButton_Conf->setEnabled(false);
+    ui->pushButton_Install->setEnabled(false);
 }
 
 void MainWindow::show_raw_gptanswer()

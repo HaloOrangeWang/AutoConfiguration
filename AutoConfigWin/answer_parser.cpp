@@ -583,18 +583,18 @@ std::wstring AnswerParser::replace_command(std::wstring raw_command, ConfirmRepl
     return command;
 }
 
-int AnswerParser::find_not_check_ed_dx(std::vector<std::pair<std::wstring, bool>> sections)
+int AnswerParser::find_not_check_ed_dx(std::vector<Section> sections)
 {
     if (sections.empty()){
         return 0;
     }
     int not_check_ed_dx = sections.size();
     for (int t = sections.size() - 1; t >= 0; t--){
-        if (sections[t].second == true && t != 0 && sections[t - 1].second == false){
+        if (sections[t].is_code == true && t != 0 && sections[t - 1].is_code == false){
             bool is_check = false;
             std::vector<std::wstring> verify_keywords = {L"验证", L"校验", L"检查", L"验证", L"测试", L"等待"};
             for (auto it = verify_keywords.begin(); it != verify_keywords.end(); it++){
-                if (sections[t - 1].first.find(*it) != std::wstring::npos && sections[t - 1].first.find(*it) <= 10){
+                if (sections[t - 1].content.find(*it) != std::wstring::npos && sections[t - 1].content.find(*it) <= 10){
                     not_check_ed_dx = t - 1;
                     is_check = true;
                     break;
@@ -653,27 +653,42 @@ std::tuple<bool, std::vector<Opt>, NeedConfirm> AnswerParser::parse_install_opt(
     if (paragraph.find(L"```") == std::wstring::npos){
         return std::tuple<bool, std::vector<Opt>, NeedConfirm>{false, {empty_opt}, need_confirm_list};
     }
-    std::vector<std::pair<std::wstring, bool>> sections = split_sections(paragraph);
+    std::vector<Section> sections = split_sections(paragraph);
     int not_check_ed_dx = find_not_check_ed_dx(sections);
     // 4.检查是否存在需要确认替换的内容
     std::vector<Opt> opt_list;
     ReplaceList confirm_replace_list;
     for (int t = 0; t < not_check_ed_dx; t++){
-        if (sections[t].second == true){
+        if (sections[t].is_code == true){
             // 进入这里，说明这段内容是一段代码
+            // 先解析这段命令是否需要在powershell中执行。如果是的话，调整命令内容
+            bool is_powershell = false;
+            if (t != 0 && sections[t - 1].is_code == false && boost::to_lower_copy(sections[t - 1].content).find(L"powershell") != std::wstring::npos){
+                is_powershell = true;
+            }
+            if (boost::istarts_with(sections[t].code_mark, L"powershell")){
+                is_powershell = true;
+            }
+            std::wstring command;
+            if (is_powershell){
+                command = convert_to_powershell(sections[t].content);
+            }else{
+                command = sections[t].content;
+            }
+            // 再检查这段命令是直接执行，还是需要进行替换确认
             ReplaceList confirm_replace;
-            if (t < sections.size() - 1 && sections[t + 1].second == false){
-                confirm_replace = check_replace(sections[t].first, sections[t + 1].first);
+            if (t < sections.size() - 1 && sections[t + 1].is_code == false){
+                confirm_replace = check_replace(command, sections[t + 1].content);
             }
             if (confirm_replace.empty()){
                 // 没有需要替换的内容，说明已经得到最终的命令了
-                Opt opt(Install, L"", sections[t].first);
+                Opt opt(Install, L"", command);
                 opt_list.push_back(opt);
             }else{
                 // 有需要替换的内容，需要进一步确认如何替换。但如果已经确认过了就可以直接返回
                 if (!replace_res.names.empty()){
-                    std::wstring command = replace_command(sections[t].first, replace_res);
-                    Opt opt(Install, L"", command);
+                    std::wstring command2 = replace_command(command, replace_res);
+                    Opt opt(Install, L"", command2);
                     opt_list.push_back(opt);
                 }else{
                     confirm_replace_list.insert(confirm_replace_list.end(), confirm_replace.begin(), confirm_replace.end());
@@ -684,15 +699,16 @@ std::tuple<bool, std::vector<Opt>, NeedConfirm> AnswerParser::parse_install_opt(
     return std::tuple<bool, std::vector<Opt>, ReplaceList>{true, opt_list, confirm_replace_list};
 }
 
-std::vector<std::pair<std::wstring, bool>> AnswerParser::split_sections(std::wstring paragraph)
+std::vector<AnswerParser::Section> AnswerParser::split_sections(std::wstring paragraph)
 {
     // 将GPT返回的一条指令，进一步拆分成若干个小区段
     // 例如：paragraph是 创建文件，输入\n```rm -fr /```，就应当拆分成 {<创建文件，不是代码>，<rm -fr /，是代码>}
 
     std::vector<std::wstring> raw_sections;
-    std::vector<std::pair<std::wstring, bool>> sections;
+    std::vector<Section> sections;
     boost::split_regex(raw_sections, paragraph, boost::wregex(L"\n"));
     bool is_code = false;
+    std::wstring code_mark;
     std::wstring code_str;
     for (int t = 0; t < raw_sections.size(); t++){
         // 不处理空行
@@ -710,7 +726,7 @@ std::vector<std::pair<std::wstring, bool>> AnswerParser::split_sections(std::wst
                     code_str.append(section_str.substr(0, end_dx));
                 }
                 code_str = trim_n(code_str);
-                sections.push_back(std::make_pair(code_str, true));
+                sections.push_back({code_str, true, code_mark});
                 is_code = false;
                 code_str.clear();
             }else{
@@ -725,13 +741,13 @@ std::vector<std::pair<std::wstring, bool>> AnswerParser::split_sections(std::wst
             if (is_code_begin && is_code_end && section_str.size() >= 7){
                 std::wstring code_str2 = section_str.substr(3, section_str.size() - 6);
                 code_str2 = trim_n(code_str2);
-                sections.push_back(std::make_pair(code_str2, true));
+                sections.push_back({code_str2, true, L""});
             }else if (is_code_begin){
                 int st_dx = section_str.find(L"```") + 3;
-                code_str = section_str.substr(st_dx, section_str.size() - st_dx);
+                code_mark = section_str.substr(st_dx, section_str.size() - st_dx);
                 is_code = true;
             }else{
-                sections.push_back(std::make_pair(raw_sections[t], false));
+                sections.push_back({raw_sections[t], false, L""});
             }
         }
     }
@@ -826,6 +842,21 @@ std::wstring AnswerParser::replace_path(std::wstring confirm_msg, ConfirmPathRes
     return L"";
 }
 
+std::wstring AnswerParser::convert_to_powershell(std::wstring raw_command)
+{
+    // 对于需要转换成powershell的形式的指令，进行处理
+    // 注：只处理1行，且不包含powershell关键词的命令
+    std::wstring command = raw_command;
+    if (raw_command.find(L'\n') == std::wstring::npos && boost::to_lower_copy(raw_command).find(L"powershell") == std::wstring::npos){
+        std::wstring tmp_command = raw_command;
+        boost::replace_all(tmp_command, L"\"", L"\\\"");
+        command = L"powershell -Command \"";
+        command.append(tmp_command);
+        command.append(L"\"");
+    }
+    return command;
+}
+
 std::tuple<std::vector<Opt>, PathList, ReplaceList> AnswerParser::parse_exec_opt(std::wstring paragraph2, ConfirmPathRes path_res, ConfirmReplaceRes replace_res)
 {
     std::wstring paragraph = remove_example(paragraph2);
@@ -835,29 +866,43 @@ std::tuple<std::vector<Opt>, PathList, ReplaceList> AnswerParser::parse_exec_opt
     ReplaceList confirm_replace_list;
 
     // 1.解析出需要执行的命令，以及命令对应的上下文
-    std::vector<std::pair<std::wstring, bool>> sections = split_sections(paragraph);
+    std::vector<Section> sections = split_sections(paragraph);
     int not_check_ed_dx = find_not_check_ed_dx(sections);
 
     for (int t = 0; t < not_check_ed_dx; t++){
-        if (sections[t].second == true){
+        if (sections[t].is_code == true){
             // 进入这里，说明这段内容是一段代码
             // 2.解析这个命令应该在哪里执行，是打开一个文件还是在命令行
             std::wstring exec_pth = L"";
             std::wstring exec_pth_confirm = L"";
-            if (t != 0 && sections[t - 1].second == false){
-                std::tuple<std::wstring, std::wstring> exec_path = get_exec_path(sections[t - 1].first);
+            if (t != 0 && sections[t - 1].is_code == false){
+                std::tuple<std::wstring, std::wstring> exec_path = get_exec_path(sections[t - 1].content);
                 exec_pth = std::get<0>(exec_path);
                 exec_pth_confirm = std::get<1>(exec_path);
             }
             // 3.解析这个命令中有没有需要替换的内容。
             ReplaceList confirm_replace;
-            if (t < sections.size() - 1 && sections[t + 1].second == false){
-                confirm_replace = check_replace(sections[t].first, sections[t + 1].first);
+            if (t < sections.size() - 1 && sections[t + 1].is_code == false){
+                confirm_replace = check_replace(sections[t].content, sections[t + 1].content);
             }
-            // 4.通过解析结果，分析这条命令可以直接执行，还是需要进一步确认
+            // 4.解析这段命令是否需要在powershell中执行。如果是的话，调整命令内容
+            bool is_powershell = false;
+            if (t != 0 && sections[t - 1].is_code == false && boost::to_lower_copy(sections[t - 1].content).find(L"powershell") != std::wstring::npos){
+                is_powershell = true;
+            }
+            if (boost::istarts_with(sections[t].code_mark, L"powershell")){
+                is_powershell = true;
+            }
+            std::wstring command;
+            if (is_powershell){
+                command = convert_to_powershell(sections[t].content);
+            }else{
+                command = sections[t].content;
+            }
+            // 5.通过解析结果，分析这条命令可以直接执行，还是需要进一步确认
             if (exec_pth_confirm.empty() && confirm_replace.empty()){
                 // 没有需要进一步的内容，可以直接执行
-                Opt opt(Exec, exec_pth, sections[t].first);
+                Opt opt(Exec, exec_pth, command);
                 opt_list.push_back(opt);
             }else{
                 bool path_need_confirm = false;
@@ -872,22 +917,22 @@ std::tuple<std::vector<Opt>, PathList, ReplaceList> AnswerParser::parse_exec_opt
                 if ((!confirm_replace.empty()) && (replace_res.names.empty())){
                     confirm_replace_list.insert(confirm_replace_list.end(), confirm_replace.begin(), confirm_replace.end());
                 }else if (!path_need_confirm){
-                    std::wstring command;
+                    std::wstring command2;
                     if (replace_res.names.empty()){
-                        command = sections[t].first;
+                        command2 = command;
                     }else{
-                        command = replace_command(sections[t].first, replace_res);
+                        command2 = replace_command(command, replace_res);
                     }
                     if (boost::starts_with(exec_pth, L"cd:")){
                         std::wstring cdname = exec_pth.substr(3, exec_pth.size() - 3);
                         std::wstring cd_cmd = L"cd /d ";
                         cd_cmd.append(cdname);
                         Opt opt1(Exec, L"", cd_cmd);
-                        Opt opt2(Exec, L"", command);
+                        Opt opt2(Exec, L"", command2);
                         opt_list.push_back(opt1);
                         opt_list.push_back(opt2);
                     }else{
-                        Opt opt(Exec, exec_pth, command);
+                        Opt opt(Exec, exec_pth, command2);
                         opt_list.push_back(opt);
                     }
                 }

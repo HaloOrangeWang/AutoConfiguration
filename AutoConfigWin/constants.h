@@ -5,7 +5,8 @@
 #include <vector>
 #include <boost/optional.hpp>
 
-const std::string ServerURL = "ws://127.0.0.1:8000/submit"; //向GPT提问的websocket地址
+const std::string ServerURL = "ws://43.133.10.205:58000/submit"; //向GPT提问的websocket地址
+//const std::string ServerURL = "ws://127.0.0.1:58000/submit";
 
 const std::vector<wchar_t> Puncs = {L'，', L'。', L'：', L'；', L'\n'}; //可用于断句的标点符号列表
 const std::vector<wchar_t> ChnQuotations = {L'‘', L'’', L'“', L'”'}; //中文引号列表

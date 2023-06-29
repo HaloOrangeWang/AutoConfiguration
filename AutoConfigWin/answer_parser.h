@@ -54,12 +54,19 @@ private:
     InstallList get_package_list(std::wstring paragraph); //获取要安装的包列表
     ReplaceList check_replace(std::wstring raw_command, std::wstring dscp); //检查安装命令中是否有需要替换的部分
     std::wstring replace_command(std::wstring raw_command, ConfirmReplaceRes replace_res);
-    std::vector<std::pair<std::wstring, bool>> split_sections(std::wstring paragraph); //将GPT返回的一条指令，进一步拆分成若干个小区段
+    struct Section
+    {
+        std::wstring content; //这一段的主体内容
+        bool is_code; //这一段是否为代码
+        std::wstring code_mark; //代码标注
+    };
+    std::vector<Section> split_sections(std::wstring paragraph); //将GPT返回的一条指令，进一步拆分成若干个小区段
     std::tuple<std::wstring, std::wstring> get_exec_path(std::wstring section); //获取这条命令在哪里执行
     std::wstring replace_path(std::wstring confirm_msg, ConfirmPathRes path_res); //确认文件路径的替换信息后，使用输入的替换结果作为最终的文件路径
-    int find_not_check_ed_dx(std::vector<std::pair<std::wstring, bool>> sections); //排除掉用于校验的段落。返回最后一个非校验段落在sections中的索引值
+    int find_not_check_ed_dx(std::vector<Section> sections); //排除掉用于校验的段落。返回最后一个非校验段落在sections中的索引值
     std::wstring del_special_char(std::wstring command_input); //删除特殊字符，如 >、注释行等
     std::vector<Opt> opt_process(std::vector<Opt> raw_opts); //对指令进行加工。如将apt-get替换为国内源，修改下载路径等
+    std::wstring convert_to_powershell(std::wstring raw_command); //对于需要在powershell中执行的指令，进行加工
     ParseResult parse_result; //最终的解析结果
     std::wstring env_os; //处理这个问题时所处的操作系统环境
     boost::optional<std::wstring> install_package; //处理这个问题时所处的操作系统环境

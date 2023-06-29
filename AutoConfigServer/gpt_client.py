@@ -15,7 +15,7 @@ def output_answer(f):
             for t in range(10000):
                 if not os.path.exists("answers/%04d.txt" % t):
                     break
-            f2 = open("answers/%04d.txt" % t, "w", encoding="utf8")
+            f2 = open("answers/%06d.txt" % t, "w", encoding="utf8")
             f2.write(question + "\n\n\n")
             f2.write(answer)
             f2.close()

@@ -6,6 +6,19 @@ import tornado.web
 import json
 from enum import IntEnum
 from typing import Optional
+import os
+
+
+sensi_words2 = []
+if os.path.exists("sensi_words.txt"):
+    sensi_words = open("sensi_words.txt", "r", encoding="utf-8").readlines()
+    sensi_words = sensi_words[:-1]
+    for t in range(len(sensi_words)):
+        if sensi_words[t].endswith("\n"):
+            sensi_words[t] = sensi_words[t][:-1]
+    for word in sensi_words:
+        if len(word) >= 2 and max([ord(t) for t in word]) >= 0x4000:
+            sensi_words2.append(word)
 
 
 class ErrorCode(IntEnum):
@@ -33,12 +46,18 @@ class MainServer(tornado.websocket.WebSocketHandler):
 
     async def on_message(self, message):
         """处理客户端发来的消息。依次将消息解码、保存并发送给GPT"""
+        for word in sensi_words2:
+            if word in message:
+                print(word)
+                self.return_answer_and_errcode(ErrorCode.MsgError)
+                return
         # 1.现将消息解码
         try:
             if type(message) is bytes:
                 message = message.decode("utf8")
         except UnicodeDecodeError:
             self.return_answer_and_errcode(ErrorCode.MsgError)
+            return
         # 2.保存消息
         self.sql_model.store_question(message)
         # 3.将消息发送给GPT，并等待答案

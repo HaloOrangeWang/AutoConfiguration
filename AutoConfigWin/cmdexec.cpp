@@ -105,7 +105,7 @@ void CmdExec::exec_real_commands(RealCmdList opt_list)
     std::function<void()> set_path = [&ofs, this](){
         ofs << L"set TEMP_PATH=%PATH%" << std::endl;
         std::wstring curpath = boost::filesystem::current_path().wstring();
-        ofs << L"set PATH=" << curpath << ";%PATH%" << std::endl;
+        ofs << L"set PATH=" << curpath << ";" << curpath << "\\git\\bin;%PATH%" << std::endl;
         // 将确认安装的目录临时添加到环境变量中
         for (int t0 = 0; t0 < new_path_list.size(); t0++){
             std::wstring abspath = boost::filesystem::absolute(new_path_list[t0]).wstring();

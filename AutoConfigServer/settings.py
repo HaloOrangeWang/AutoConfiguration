@@ -1,5 +1,2 @@
-MYSQL_HOST = "127.0.0.1"
-MYSQL_PORT = 3306
-MYSQL_USER = "root"
-MYSQL_PASSWD = "123456"
-MYSQL_DB = "AutoConfigure"
+DB_SERVER = "mongodb://localhost:27017"
+DB_NAME = "AutoConfig"

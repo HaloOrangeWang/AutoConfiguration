@@ -1,26 +1,10 @@
+from logs import Log
 from concurrent.futures import ThreadPoolExecutor
 import threading
 from typing import Optional
+import traceback
 import openai
 import os
-
-
-def output_answer(f):
-    def call(cls, question: str):
-        answer = f(cls, question)
-        if answer is not None:
-            if not os.path.exists("answers"):
-                os.makedirs("answers")
-            t = 0
-            for t in range(10000):
-                if not os.path.exists("answers/%04d.txt" % t):
-                    break
-            f2 = open("answers/%06d.txt" % t, "w", encoding="utf8")
-            f2.write(question + "\n\n\n")
-            f2.write(answer)
-            f2.close()
-        return answer
-    return call
 
 
 class GptClient:
@@ -41,7 +25,6 @@ class GptClient:
         # self.lock.release()
 
     # noinspection PyMethodMayBeStatic
-    @output_answer
     def submit_question(self, question: str) -> Optional[str]:
         """将问题提交给GPT。并等待答案"""
         messages = [
@@ -53,4 +36,5 @@ class GptClient:
             response = openai.ChatCompletion.create(model="gpt-3.5-turbo", messages=messages)
             return response["choices"][0]["message"]["content"]
         except Exception:
+            Log.print_log("GPT返回异常： %s" % traceback.format_exc())
             return None

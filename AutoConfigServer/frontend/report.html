@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="zh-cmn-Hans">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=0">
+    <title>反馈页面</title>
+    <link rel="stylesheet" href="/static/bootstrap-3.4.1-dist/css/bootstrap.css">
+    <script src="/static/jquery-3.6.0.js"></script>
+    <script src="/static/bootstrap-3.4.1-dist/js/bootstrap.js"></script>
+</head>
+
+<body>
+    <form method="POST">
+        <div class="mb-3" style="margin-left: 5%; width: 90%; margin-top: 16px; text-align:center">
+            <label class="title-label">我想提出改进意见</label>
+        </div>
+
+        <div class="mb-3" style="margin-left: 5%; width: 90%; margin-top: 16px">
+            <label class="form-label">意见内容</label>
+            <textarea class="form-control" id="feedback" name="feedback"></textarea>
+        </div>
+
+        <div class="mb-3" style="margin-left: 5%; width: 90%; margin-top: 80px; text-align:center">
+            <label class="title-label">我想反馈BUG</label>
+        </div>
+
+        <div class="mb-3" style="margin-left: 5%; width: 90%; margin-top: 16px">
+            <label class="form-label">你向GPT提出的问题</label>
+            <textarea class="form-control" id="question" name="question"></textarea>
+        </div>
+
+        <div class="mb-3" style="margin-left: 5%; width: 90%; margin-top: 16px">
+            <label class="form-label">得到的答案</label>
+            <textarea class="form-control" id="answer" name="answer"></textarea>
+        </div>
+
+        <div class="mb-3" style="margin-left: 5%; width: 90%; margin-top: 16px">
+            <label class="form-label">反馈内容</label>
+            <textarea class="form-control" id="bugreport" name="bugreport"></textarea>
+        </div>
+
+        <div style="margin-top: 16px; width: 100%; text-align:center">
+            <button type="submit" class="btn btn-primary">提交</button>
+        </div>
+    </form>
+</body>
+
+<style>
+    .form-label {
+        font-family: "宋体", sans-serif;
+        font-size: 18px;
+    }
+    .title-label {
+        font-family: "宋体", sans-serif;
+        font-size: 28px;
+    }
+
+    textarea {
+        min-height: 128px;
+        width: 90%;
+        resize: none;
+    }
+</style>
+
+</html>

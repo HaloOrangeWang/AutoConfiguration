@@ -5,3 +5,5 @@ TestServer/*.txt
 build-*
 nohup.out
 sensi_words.txt
+AutoConfigServer/frontend/static/
+AutoConfigServer/log/

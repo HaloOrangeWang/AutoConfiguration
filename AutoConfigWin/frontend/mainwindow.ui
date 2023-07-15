@@ -414,8 +414,47 @@
       <x>768</x>
       <y>96</y>
       <width>432</width>
-      <height>496</height>
+      <height>416</height>
      </rect>
+    </property>
+   </widget>
+   <widget class="QLabel" name="label_report">
+    <property name="geometry">
+     <rect>
+      <x>768</x>
+      <y>528</y>
+      <width>384</width>
+      <height>20</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <family>楷体</family>
+      <pointsize>12</pointsize>
+      <underline>true</underline>
+     </font>
+    </property>
+    <property name="text">
+     <string>我要反馈BUG或提出改进建议</string>
+    </property>
+   </widget>
+   <widget class="QLabel" name="label_11">
+    <property name="geometry">
+     <rect>
+      <x>768</x>
+      <y>560</y>
+      <width>384</width>
+      <height>20</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <family>楷体</family>
+      <pointsize>12</pointsize>
+     </font>
+    </property>
+    <property name="text">
+     <string>自动配置环境的程序 版本0.91</string>
     </property>
    </widget>
   </widget>

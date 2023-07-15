@@ -28,6 +28,7 @@ public:
 
     void init_graphics(); //初始化主界面
     bool eventFilter(QObject *obj, QEvent *event);
+    void textedit_log_handler(QtMsgType type, const QMessageLogContext &context, const QString &msg); //将日志重定向至textedit中
 
     enum Status
     {
@@ -37,6 +38,9 @@ public:
         PrepareExecute,
         Execute
     };
+
+signals:
+    void append_log(QString log); //向日志界面中添加日志
 
 public slots:
     void on_add_env_line(); //点击按钮，需要在“环境配置”中增加一行时，执行这个事件
@@ -61,6 +65,9 @@ public slots:
     // 命令执行完成和失败的回调
     void on_exec_success(std::wstring rtn_msg);
     void on_exec_failed(std::wstring err_msg);
+
+    // 添加日志的回调
+    void on_append_log(QString log);
 private:
     Ui::MainWindow *ui;
 
@@ -80,8 +87,10 @@ private:
     boost::optional<std::wstring> package_to_install; //询问需要安装的软件名
     std::wstring raw_answer_ws; //GPT返回的原始的答案字符串
     int status = Init; //这个模块的状态：初始/下载中/解析中/解析成功/执行中
-    void connect_parser_signals(); //将AnswerParser中的一些信号/插槽，与GptComm、子窗口中的一些信号/插槽相连接    
+    void connect_parser_signals(); //将AnswerParser中的一些信号/插槽，与GptComm、子窗口中的一些信号/插槽相连接
+    void show_report_page(); //展示“反馈改进意见和bug”的页面
     QDialog* wait_dialog; //显示“请稍后”的对话框
+
 //    QMessageBox* wait_msgbox;
 };
 

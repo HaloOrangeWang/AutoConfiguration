@@ -6,6 +6,7 @@
 #include <QMessageBox>
 #include <QDebug>
 #include <QHBoxLayout>
+#include <QDesktopServices>
 
 MainWindow::MainWindow(GptComm* gpt_comm_, CmdExec* cmd_exec_, QWidget *parent)
     : QMainWindow(parent)
@@ -35,6 +36,10 @@ void MainWindow::init_graphics()
                                      color:#999999;\
                                      }");
     ui->label_rawgpt->installEventFilter(this);
+    ui->label_report->setStyleSheet("QLabel{\
+                                     color:#4444bb;\
+                                     }");
+    ui->label_report->installEventFilter(this);
     ui->text_log->setReadOnly(true);
     ui->text_log->setStyleSheet("background-color:#f3f3f3;");
 
@@ -68,16 +73,29 @@ void MainWindow::init_graphics()
     // 绑定命令行执行结果的事件
     connect(cmd_exec, SIGNAL(on_exec_success(std::wstring)), this, SLOT(on_exec_success(std::wstring)));
     connect(cmd_exec, SIGNAL(on_exec_failed(std::wstring)), this, SLOT(on_exec_failed(std::wstring)));
+
+    // 绑定日志处理的事件
+    connect(this, SIGNAL(append_log(QString)), this, SLOT(on_append_log(QString)));
 }
 
 bool MainWindow::eventFilter(QObject *obj, QEvent *event)
 {
     if (obj == ui->label_rawgpt){
         if (event->type() == QEvent::MouseButtonRelease){
-            show_raw_gptanswer(); //调用双击事件
+            show_raw_gptanswer(); //调用点击事件
+        }
+    }
+    if (obj == ui->label_report){
+        if (event->type() == QEvent::MouseButtonRelease){
+            show_report_page(); //调用点击事件
         }
     }
     return QMainWindow::eventFilter(obj, event);
+}
+
+void MainWindow::textedit_log_handler(QtMsgType type, const QMessageLogContext &context, const QString &msg)
+{
+    emit append_log(msg);
 }
 
 void MainWindow::on_add_env_line()
@@ -319,6 +337,7 @@ void MainWindow::exec()
 
 void MainWindow::on_answer(std::wstring message)
 {
+    qDebug() << "已收到GPT返回的答案";
     if (parse_answer == nullptr){
         // 此次配置的第一个问题：新建一个AnswerParser
         wait_dialog->close();
@@ -362,28 +381,42 @@ void MainWindow::on_exec_failed(std::wstring rtn_msg)
 void MainWindow::on_error_msg(int error_id)
 {
     wait_dialog->close();
-    qDebug() << "error_id = " << error_id << endl;
     if (parse_answer != nullptr){
         parse_answer.reset(nullptr);
     }
     switch (error_id){
     case gpt_comm->Busy:
+        qDebug() << "上一个问题还没有处理完，不能继续提问。错误码为" << error_id;
         QMessageBox::about(this, "Hint", QString::fromStdWString(L"上一个问题还没有处理完，不能继续提问"));
         break;
     case gpt_comm->FailedToConnect:
-        QMessageBox::about(this, "Hint", QString::fromStdWString(L"WebSocket连接失败"));
+        qDebug() << "与WebSocket服务器连接失败。错误码为" << error_id;
+        QMessageBox::about(this, "Hint", QString::fromStdWString(L"与WebSocket服务器连接失败"));
         break;
     case gpt_comm->WebSocketError:
-        QMessageBox::about(this, "Hint", QString::fromStdWString(L"WebSocket连接过程中出现异常"));
+        qDebug() << "与WebSocket服务器连接过程中出现异常。错误码为" << error_id;
+        QMessageBox::about(this, "Hint", QString::fromStdWString(L"与WebSocket服务器连接过程中出现异常"));
         break;
     case gpt_comm->ServerError:
-        QMessageBox::about(this, "Hint", QString::fromStdWString(L"WebSocket服务器返回异常"));
+        qDebug() << "WebSocket服务器内部异常。错误码为" << error_id;
+        QMessageBox::about(this, "Hint", QString::fromStdWString(L"WebSocket服务器内部异常"));
         break;
     case gpt_comm->GPTError:
     default:
+        qDebug() << "GPT没有返回任何答案。错误码为" << error_id;
         QMessageBox::about(this, "Hint", QString::fromStdWString(L"GPT没有返回任何答案"));
         break;
     }
+}
+
+void MainWindow::on_append_log(QString log)
+{
+    ui->text_log->append(log);
+}
+
+void MainWindow::show_report_page()
+{
+    QDesktopServices::openUrl(QUrl(ReportURL.c_str()));
 }
 
 MainWindow::~MainWindow()

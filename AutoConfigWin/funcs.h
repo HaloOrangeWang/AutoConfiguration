@@ -3,6 +3,7 @@
 #ifndef FUNCS_H
 #define FUNCS_H
 
+#include "constants.h"
 #include <string>
 #include <Windows.h>
 
@@ -217,6 +218,23 @@ inline std::wstring trim_between_n(std::wstring str)
         }
     }
     return str_output;
+}
+
+// 将OptType转换为字符串
+inline std::wstring get_opt_type_str(int opt_type)
+{
+    if (opt_type == Ignore){
+        return L"不需要处理";
+    }else if (opt_type == Download){
+        return L"下载";
+    }else if (opt_type == Install){
+        return L"安装";
+    }else if (opt_type == Exec){
+        return L"执行命令";
+    }else if (opt_type == Verify){
+        return L"验证";
+    }
+    return L"未知";
 }
 
 #endif // FUNCS_H

@@ -3,6 +3,7 @@
 #include "cmdlistview.h"
 #include <QMessageBox>
 #include <boost/filesystem.hpp>
+#include <QDebug>
 
 void CmdListItem::init(std::string bkgd_color, RealOpt opt, int idx2)
 {
@@ -150,6 +151,8 @@ void CmdListItem::on_save()
     std::wstring title_str = std::to_wstring(idx + 1);
     title_str.append(L". 自定义");
     title->setText(QString::fromStdWString(title_str));
+
+    qDebug() << "修改了第" << idx << "号命令。";
 }
 
 void CmdListItem::on_nosave()
@@ -268,6 +271,7 @@ void CmdListView::rerander()
 
 void CmdListView::on_swap(int dx1, int dx2)
 {
+    qDebug() << "第" << dx1 << "和第" << dx2 << "号命令互换了位置。";
     // 交换这两个命令
     RealOpt tmp_opt = real_opt_list[dx1];
     real_opt_list[dx1] = real_opt_list[dx2];
@@ -279,6 +283,7 @@ void CmdListView::on_swap(int dx1, int dx2)
 
 void CmdListView::on_del(int dx)
 {
+    qDebug() << "删除了第" << dx << "号命令。";
     // 删除这个指令
     int dx2 = 0;
     for (auto iter = real_opt_list.begin(); iter != real_opt_list.end(); iter++){
@@ -294,6 +299,7 @@ void CmdListView::on_del(int dx)
 
 void CmdListView::add_newcmd()
 {
+    qDebug() << "在末尾处增加了一条命令。";
     // 生成一个新的命令
     RealOpt tmpopt;
     tmpopt.opt = Opt{Exec, L"", L""};

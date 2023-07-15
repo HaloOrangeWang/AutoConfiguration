@@ -3,8 +3,8 @@
 #include "gpt_comm.h"
 #include "constants.h"
 #include "funcs.h"
-#include <rapidjson/document.h>
 #include <QDebug>
+#include <rapidjson/document.h>
 
 GptComm::GptComm()
 {
@@ -38,6 +38,7 @@ void GptComm::input_question(std::wstring question_str)
 
 int GptComm::connect_server()
 {
+    qDebug() << "正在连接Websocket服务器";
     // 连接服务器
     websocketpp::lib::error_code ec;
     conn = ws_client.get_connection(ServerURL, ec);
@@ -55,6 +56,7 @@ int GptComm::connect_server()
 
 void GptComm::on_open(Client* c, websocketpp::connection_hdl hdl)
 {
+    qDebug() << "Websocket服务器连接成功，正在发送问题";
     //连接成功后，将问题发送给GPT，等待收到答案
     std::string question2 = UnicodeToUTF8(question);
     ws_client.send(hdl, question2, websocketpp::frame::opcode::text);
@@ -62,12 +64,14 @@ void GptComm::on_open(Client* c, websocketpp::connection_hdl hdl)
 
 void GptComm::send_next_question(std::wstring question_str)
 {
+    qDebug() << "程序向GPT追加提问";
     std::string question2 = UnicodeToUTF8(question_str);
     ws_client.send(conn->get_handle(), question2, websocketpp::frame::opcode::text);
 }
 
 void GptComm::on_fail(Client* c, websocketpp::connection_hdl hdl)
 {
+    qDebug() << "Websocket异常";
     // 连接时出错（比如404了），会调用这个函数
     std::string error_reason = c->get_con_from_hdl(hdl)->get_ec().message();
     emit ReturnErrorMsg(WebSocketError);
@@ -92,6 +96,7 @@ void GptComm::on_close(Client* c, websocketpp::connection_hdl hdl)
 
 void GptComm::on_message(Client* c, websocketpp::connection_hdl hdl, Client::message_ptr msg)
 {
+    qDebug() << "收到了Websocket返回的信息";
     // 1.先判断是否正确接收到答案了
     std::string answer;
     if (msg->get_opcode() == websocketpp::frame::opcode::text){
@@ -121,7 +126,6 @@ void GptComm::on_message(Client* c, websocketpp::connection_hdl hdl, Client::mes
         emit_err_msg(WebSocketError, c, hdl);
         return;
     }
-    qDebug() << "answer = " << QString::fromStdString(answer);
 
     // 2.分析问题的答案
     std::wstring answer_ws = UTF8ToUnicode(answer);

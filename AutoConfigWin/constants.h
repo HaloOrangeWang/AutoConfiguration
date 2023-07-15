@@ -6,6 +6,7 @@
 #include <boost/optional.hpp>
 
 const std::string ServerURL = "ws://43.133.10.205:58000/submit"; //向GPT提问的websocket地址
+const std::string ReportURL = "http://43.133.10.205:58000/report"; //反馈bug和提出改进意见的地址
 //const std::string ServerURL = "ws://127.0.0.1:58000/submit";
 
 const std::vector<wchar_t> Puncs = {L'，', L'。', L'：', L'；', L'\n'}; //可用于断句的标点符号列表
@@ -65,6 +66,5 @@ struct ExecRes
     int return_value; //命令执行的返回值
     std::wstring out_str; //这条命令在stdout的结果
 };
-
 
 #endif // CONSTANTS_H

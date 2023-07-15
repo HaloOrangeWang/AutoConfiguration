@@ -7,6 +7,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/regex.hpp>
 #include <functional>
+#include <QDebug>
 
 AnswerParser::AnswerParser(std::wstring os, boost::optional<std::wstring> package, CmdExec* cmd_exec_)
 {
@@ -106,9 +107,11 @@ void AnswerParser::parse_answer()
             if (std::get<2>(res).empty()){
                 parse_result.opt_list.push_back(std::get<1>(res));
             }else{
-                // 对于不明确的指令，需要继续提问
-                emit EmitGPTQuestion(std::get<2>(res));
-                return;
+                // 对于不明确的指令，可以不执行
+                // TODO: 未来对于不明确的指令，需要继续提问
+                // emit EmitGPTQuestion(std::get<2>(res));
+                qDebug() << "第" << curr_node + 1 << "号命令，类型为下载，但没有解析出下载地址";
+                // return;
             }
         }else if (opt_type == Install){
             // 处理安装指令
@@ -277,7 +280,7 @@ std::vector<int> AnswerParser::get_opt_type(std::vector<std::wstring> paragraphs
         }else{
             first_sentence = paragraph;
         }
-        std::vector<std::wstring> verify_keywords = {L"验证", L"校验", L"检查", L"使用", L"验证", L"测试"};
+        std::vector<std::wstring> verify_keywords = {L"验证", L"校验", L"检查", L"验证", L"测试"};
         bool is_confirm = false;
         for (auto it = verify_keywords.begin(); it != verify_keywords.end(); it++){
             if (first_sentence.find(*it) != std::wstring::npos){
@@ -289,6 +292,12 @@ std::vector<int> AnswerParser::get_opt_type(std::vector<std::wstring> paragraphs
         if (!is_confirm){
             break;
         }
+    }
+    // 将这几段话的分类输出到屏幕日志栏中
+    QDebug logstr = qDebug();
+    logstr << "GPT返回的每段内容的类别分别是：";
+    for (int t = 0; t < paragraphs.size(); t++){
+        logstr << QString::fromStdWString(get_opt_type_str(opt_type_list[t])) << "，";
     }
     return opt_type_list;
 }

@@ -39,9 +39,6 @@ void CmdListItem::init(std::string bkgd_color, RealOpt opt, int idx2)
         title_str.append(L"自定义");
     }else{
     switch (opt.opt.opt_type){
-        case Download:
-            title_str.append(L"下载");
-            break;
         case Install:
             title_str.append(L"安装");
             break;

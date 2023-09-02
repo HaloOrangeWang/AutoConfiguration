@@ -12,21 +12,13 @@
 AnswerParser::AnswerParser(std::wstring os, boost::optional<std::wstring> package, CmdExec* cmd_exec_)
 {
     env_os = os;
-    if (package.has_value()){
-        install_package = package.value();
-    }else{
-        install_package = boost::none;
-    }
     cmd_exec = cmd_exec_;
 }
 
-bool AnswerParser::parse_first_answer(std::wstring answer_str)
+bool AnswerParser::parse_first_answer(std::wstring origin_answer, std::wstring check_answer)
 {
-    num_question = 1;
     // 1.先将原始答案分段
-    raw_answer_ws = answer_str;
-    std::wstring answer_str2 = trim_between_n(answer_str);
-    std::vector<std::wstring> paragraphs = split_paragraphs(answer_str2);
+    std::vector<std::wstring> paragraphs = get_exec_paragraphs(origin_answer, check_answer);
     if (paragraphs.size() == 0){
         return false;
     }
@@ -40,35 +32,6 @@ bool AnswerParser::parse_first_answer(std::wstring answer_str)
         }
     }
     curr_node = 0;
-    // 3.处理分段后的GPT返回结果
-    parse_answer();
-    return true;
-}
-
-bool AnswerParser::parse_second_answer(std::wstring answer_str)
-{
-    num_question += 1;
-    if (num_question >= 10){
-        return false;
-    }
-    // 1.先将答案分段
-    std::wstring answer_str2 = trim_between_n(answer_str);
-    std::vector<std::wstring> paragraphs = split_paragraphs(answer_str2);
-    if (paragraphs.size() == 0){
-        return false;
-    }
-    // 2.针对每个段落，分析这个段落对应的执行类型，并构建执行树
-    std::vector<int> opt_type_list = get_opt_type(paragraphs);
-    int parent_node = curr_node;
-    int next_node = para_tree.size();
-    for (int para_it = 0; para_it < paragraphs.size(); para_it++){
-        if (para_it != paragraphs.size() - 1){
-            para_tree.push_back(ParaTree(paragraphs[para_it], opt_type_list[para_it], parent_node, para_tree.size() + 1));
-        }else{
-            para_tree.push_back(ParaTree(paragraphs[para_it], opt_type_list[para_it], parent_node, boost::none));
-        }
-    }
-    curr_node = next_node;
     // 3.处理分段后的GPT返回结果
     parse_answer();
     return true;
@@ -100,50 +63,23 @@ void AnswerParser::parse_answer()
         // 1.针对这一段话，获取命令执行的内容，以及命令执行的方法
         if (opt_type == Ignore){
             // 如果这条指令不需要处理，那么直接忽略即可
-        }else if (opt_type == Download){
-            // 处理下载指令
-            std::tuple<std::wstring, Opt, std::wstring> res = parse_download_opt(para_tree[curr_node].text);
-            packages_to_download.push_back(std::get<0>(res));
-            if (std::get<2>(res).empty()){
-                parse_result.opt_list.push_back(std::get<1>(res));
-            }else{
-                // 对于不明确的指令，可以不执行
-                // TODO: 未来对于不明确的指令，需要继续提问
-                // emit EmitGPTQuestion(std::get<2>(res));
-                qDebug() << "第" << curr_node + 1 << "号命令，类型为下载，但没有解析出下载地址";
-                // return;
-            }
         }else if (opt_type == Install){
             // 处理安装指令
             ConfirmReplaceRes confirm_res_curnode{};
             if (confirm_replace_res.find(curr_node) != confirm_replace_res.end()){
                 confirm_res_curnode = confirm_replace_res.at(curr_node);
             }
-            std::tuple<bool, std::vector<Opt>, NeedConfirm> res = parse_install_opt(para_tree[curr_node].text, confirm_res_curnode);
+            std::tuple<bool, std::vector<Opt>, ReplaceList> res = parse_install_opt(para_tree[curr_node].text, confirm_res_curnode);
             if (std::get<0>(res) == true){
-                NeedConfirm confirm = std::get<2>(res);
-                if (confirm.type() == typeid(InstallList)){
-                    InstallList install_q = boost::get<InstallList>(confirm);
-                    if (install_q.empty()){
-                        std::vector<Opt> opt_list = std::get<1>(res);
-                        for (auto it = opt_list.begin(); it != opt_list.end(); it++){
-                            parse_result.opt_list.push_back(*it);
-                        }
-                    }else{
-                        emit ConfirmInstall(install_q, para_tree[curr_node].text);
-                        return;
+                ReplaceList confirm = std::get<2>(res);
+                if (confirm.empty()){
+                    std::vector<Opt> opt_list = std::get<1>(res);
+                    for (auto it = opt_list.begin(); it != opt_list.end(); it++){
+                        parse_result.opt_list.push_back(*it);
                     }
                 }else{
-                    ReplaceList replace_q = boost::get<ReplaceList>(confirm);
-                    if (replace_q.empty()){
-                        std::vector<Opt> opt_list = std::get<1>(res);
-                        for (auto it = opt_list.begin(); it != opt_list.end(); it++){
-                            parse_result.opt_list.push_back(*it);
-                        }
-                    }else{
-                        emit ConfirmReplace(replace_q, para_tree[curr_node].text);
-                        return;
-                    }
+                    emit ConfirmReplace(confirm, para_tree[curr_node].text);
+                    return;
                 }
             }else{
                 // todo: emit解析失败的指令
@@ -185,28 +121,28 @@ void AnswerParser::parse_answer()
             }else{
                 // 某个段落既没有父级段落，又没有“下一个”段落，说明已经完成了整篇回答的解析。此时直接返回解析结果即可。
                 parse_result.opt_list = opt_process(parse_result.opt_list);
-                emit ParseSuccess(parse_result.opt_list, raw_answer_ws);
+                emit ParseSuccess(parse_result.opt_list);
                 return;
             }
         }
     }
 }
 
-std::vector<std::wstring> AnswerParser::split_paragraphs(std::wstring answer_str)
+std::vector<std::wstring> AnswerParser::get_exec_paragraphs(std::wstring origin_answer, std::wstring check_answer)
 {
     // 1.将答案按照'\n'拆分
     std::vector<std::wstring> raw_paragraphs;
     std::vector<std::wstring> paragraphs;
-    boost::split_regex(raw_paragraphs, answer_str, boost::wregex(L"\n"));
+    boost::split_regex(raw_paragraphs, origin_answer, boost::wregex(L"\n"));
     // 2.按照命令id进行组合
     // 如果这行内容以 a. 开头（a为当前command_id），则说明它开启了一个新命令，否则说明它不是新命令的起始
     boost::wregex regstr(L"^(?<id2>[0-9]+)\\.(.*)");
-    int command_id = 1;
+    int command_id = 0;
     for (int para_it = 0; para_it < raw_paragraphs.size(); para_it++){
         boost::wsmatch match_res;
         if (boost::regex_match(raw_paragraphs[para_it], match_res, regstr)){
             int command_id2 = stoi(match_res.str(L"id2"));
-            if (command_id2 == command_id){
+            if (command_id2 == command_id + 1){
                 paragraphs.push_back(raw_paragraphs[para_it]);
                 command_id += 1;
             }else{
@@ -220,10 +156,35 @@ std::vector<std::wstring> AnswerParser::split_paragraphs(std::wstring answer_str
             }
         }
     }
-    if (paragraphs.empty()){
-        paragraphs = {answer_str};
+    // 3.根据check_answer中的内容，去除仅用于检查的段落
+    std::vector<std::wstring> raw_check_paragraphs;
+    std::vector<int> check_para_dxs; //标注哪些段落是仅仅用于校验的。
+    boost::split_regex(raw_check_paragraphs, check_answer, boost::wregex(L"\n"));
+    for (int t = raw_check_paragraphs.size() - 1; t >= 0; t--){
+        int pos1 = raw_check_paragraphs[t].find(L"[");
+        int pos2 = raw_check_paragraphs[t].find(L"]");
+        if (pos1 != std::wstring::npos && pos2 != std::wstring::npos && pos1 < pos2){
+            if (pos2 - pos1 == 1){
+                // 如果给出的检查段落id列表是[]，则说明没有“仅用于检查”的段落。
+                break;
+            }
+            std::wstring substr = raw_check_paragraphs[t].substr(pos1 + 1, pos2 - pos1 - 1);
+            std::vector<std::wstring> raw_id_list;
+            boost::split(raw_id_list, substr, boost::is_any_of(L","));
+            for (int t0 = 0; t0 < raw_id_list.size(); t0++){
+                // 这里减1是因为GPT返回的索引是从1开始计数的，而paragraph数组是从0开始计数的
+                check_para_dxs.push_back(stoi(raw_id_list[t0]) - 1);
+            }
+            break;
+        }
     }
-    return paragraphs;
+    std::vector<std::wstring> exec_paragraphs;
+    for (int t = 0; t < paragraphs.size(); t++){
+        if (std::find(check_para_dxs.begin(), check_para_dxs.end(), t) == check_para_dxs.end()){
+            exec_paragraphs.push_back(paragraphs[t]);
+        }
+    }
+    return exec_paragraphs;
 }
 
 std::vector<int> AnswerParser::get_opt_type(std::vector<std::wstring> paragraphs)
@@ -244,10 +205,6 @@ std::vector<int> AnswerParser::get_opt_type(std::vector<std::wstring> paragraphs
         }
         if (first_sentence.find(L"安装") != std::wstring::npos && first_sentence.find(L"安装") <= 10){
             opt_type_list[t] = Install;
-            continue;
-        }
-        if (first_sentence.find(L"下载") != std::wstring::npos && first_sentence.find(L"下载") <= 10){
-            opt_type_list[t] = Download;
             continue;
         }
         if (paragraph.find(L"```") != std::wstring::npos){
@@ -271,28 +228,6 @@ std::vector<int> AnswerParser::get_opt_type(std::vector<std::wstring> paragraphs
         opt_type_list[t] = Unmanageable;
         continue;
     }
-    // 剔除出用于校验的命令
-    for (int t = paragraphs.size() - 1; t >= 0; t--){
-        std::wstring paragraph = paragraphs[t];
-        std::wstring first_sentence;
-        if (paragraph.find(L"\n") != std::wstring::npos){
-            first_sentence = paragraph.substr(0, paragraph.find(L"\n"));
-        }else{
-            first_sentence = paragraph;
-        }
-        std::vector<std::wstring> verify_keywords = {L"验证", L"校验", L"检查", L"验证", L"测试"};
-        bool is_confirm = false;
-        for (auto it = verify_keywords.begin(); it != verify_keywords.end(); it++){
-            if (first_sentence.find(*it) != std::wstring::npos){
-                opt_type_list[t] = Verify;
-                is_confirm = true;
-                break;
-            }
-        }
-        if (!is_confirm){
-            break;
-        }
-    }
     // 将这几段话的分类输出到屏幕日志栏中
     QDebug logstr = qDebug();
     logstr << "GPT返回的每段内容的类别分别是：";
@@ -302,217 +237,13 @@ std::vector<int> AnswerParser::get_opt_type(std::vector<std::wstring> paragraphs
     return opt_type_list;
 }
 
-std::tuple<std::wstring, Opt, std::wstring> AnswerParser::parse_download_opt(std::wstring paragraph)
+bool AnswerParser::is_installed(std::wstring command)
 {
-    // 先获取要下载的内容
-    std::wstring package_name;
-    int pos_start = paragraph.find(L"下载") + 2;
-    while (pos_start < paragraph.size() && paragraph[pos_start] == L' '){
-        pos_start += 1;
-    }
-    bool is_eng_package_name = is_eng_number(paragraph[pos_start]);
-    for (int pos = pos_start; pos < paragraph.size(); pos++){
-        if (is_eng_package_name){
-            if (is_eng_number(paragraph[pos])){
-                package_name += paragraph[pos];
-            }else{
-                break;
-            }
-        }else{
-            if (std::find(Puncs.begin(), Puncs.end(), paragraph[pos]) == Puncs.end()){
-                package_name += paragraph[pos];
-            }else{
-                break;
-            }
-        }
-    }
-    Opt empty_opt(0, L"", L"");
-    std::wstring next_question = L"如何在";
-    next_question.append(env_os);
-    next_question.append(L"环境下，使用wget下载");
-    next_question.append(package_name);
-    next_question.append(L"（wget已安装）");
-    // 获取要下载的路径
-    std::wstring site;
-    int pos_site = paragraph.find(L"http://");
-    if (pos_site == std::wstring::npos){
-        pos_site = paragraph.find(L"https://");
-    }
-    if (pos_site == std::wstring::npos){
-        return std::tuple<std::wstring, Opt, std::wstring>{package_name, empty_opt, next_question};
-    }
-    wchar_t url_chars[] = L":-.?,'/\\+&%$#@~!=";
-    int pos_site_end = -1;
-    for (int t = pos_site; t != paragraph.size(); t++){
-        // 判断这个字符是否为英文字符或特殊url字符，以此来判断url地址在段落中的位置。
-        if (is_eng_number(paragraph[t])){
-            continue;
-        }
-        bool is_special_url_char = false;
-        for (int t0 = 0; t0 < wcslen(url_chars); t0++){
-            if (paragraph[t] == url_chars[t0]){
-                is_special_url_char = true;
-                break;
-            }
-        }
-        if (is_special_url_char){
-            continue;
-        }
-        pos_site_end = t - 1;
-        break;
-    }
-    site = paragraph.substr(pos_site, pos_site_end - pos_site + 1);
-    // 根据下载的url地址，确定输出路径
-    if (site.find(L"github.com") != std::wstring::npos){
-        // 如果地址是github，则git clone
-        std::wstring command = L"git clone ";
-        std::wstring cp_site = site;
-        command.append(cp_site);
-        Opt opt(Download, L"", command);
-        return std::tuple<std::wstring, Opt, std::wstring>{package_name, opt, L""};
-    }else{
-        // 如果地址不是github，则检查地址的后缀名，如果是一个压缩包，则wget
-        std::vector<std::wstring> suffixs = {L".zip", L".rar", L".tar.gz", L".tar", L".7z", L".iso", L".exe", L".dll", L".lib", L".deb", L".a", L".so"};
-        bool can_wget = false;
-        for (auto it = suffixs.cbegin(); it != suffixs.cend(); it++){
-            if (boost::iends_with(site, *it)){
-                can_wget = true;
-                break;
-            }
-        }
-        if (can_wget){
-            std::wstring command = L"wget ";
-            command.append(site);
-            Opt opt(Download, L"", command);
-            return std::tuple<std::wstring, Opt, std::wstring>{package_name, opt, L""};
-        }else{
-            return std::tuple<std::wstring, Opt, std::wstring>{package_name, empty_opt, next_question};
-        }
-    }
-}
-
-std::wstring AnswerParser::remove_example(std::wstring paragraph)
-{
-    // 删除一段话中“例如”、“如”后面的内容。但如果遇到了中文分号或中文句号，再往后的内容可予以保留
-    int start_dx = 0;
-    bool del_status = false;  //当前内容是否删去的标志位
-    std::wstring output_str;
-    for (int t = 0; t < paragraph.size(); t++){
-        if (del_status == false){
-            if (t + 2 < paragraph.size() &&
-                std::find(Puncs.begin(), Puncs.end(), paragraph[t]) != Puncs.end() &&
-                paragraph[t + 1] == L'例' &&
-                paragraph[t + 2] == L'如'){
-                del_status = true;
-                output_str.append(paragraph.substr(start_dx, t - start_dx));
-            }
-            if (t + 2 < paragraph.size() &&
-                std::find(Puncs.begin(), Puncs.end(), paragraph[t]) != Puncs.end() &&
-                paragraph[t + 1] == L'如' &&
-                std::find(Puncs.begin(), Puncs.end(), paragraph[t + 2]) != Puncs.end()){
-                del_status = true;
-                output_str.append(paragraph.substr(start_dx, t - start_dx));
-            }
-        }else{
-            if (paragraph[t] == L'。' || paragraph[t] == L'；'){
-                del_status = false;
-                start_dx = t;
-            }
-        }
-    }
-
-    if (!del_status){
-        output_str.append(paragraph.substr(start_dx, paragraph.size() - start_dx));
-    }
-    return output_str;
-}
-
-bool AnswerParser::is_installed(std::wstring package_name)
-{
-    // 用cmd命令执行 where xxx，根据返回值判断软件是否已经安装
-    std::wstring command = L"where ";
-    command.append(package_name);
     ExecRes res = cmd_exec->exec_simple_command(command);
     if (res.return_value != 0){
         return false;
     }
-    // 特例：如果where返回结果中，第一行内容包含了WindowsApps，则也应认定为未安装
-    std::wstring cmdstr(res.out_str);
-    std::wstring first_line;
-    if (cmdstr.find(L"\n") != std::wstring::npos){
-        first_line = cmdstr.substr(0, cmdstr.find(L"\n"));
-    }else{
-        first_line = cmdstr;
-    }
-    if (first_line.find(L"WindowsApps") != std::wstring::npos){
-        return false;
-    }
     return true;
-}
-
-int AnswerParser::is_confirm_install(std::wstring package_name)
-{
-    // 一个包是否已被确认过安装。0表示未被确认过，1表示被确认过没安装，2表示被确认过已安装
-    auto find_res = std::find_if(confirm_install_res.begin(), confirm_install_res.end(), [&package_name](ConfirmInstallRes x){
-        return bool(_wcsicmp(package_name.c_str(), x.package_name.c_str()) == 0);
-    });
-    if (find_res == confirm_install_res.end()){
-        return 0;
-    }
-    bool is_installed = find_res->path.has_value();
-    if (is_installed){
-        return 2;
-    }else{
-        return 1;
-    }
-}
-
-InstallList AnswerParser::get_package_list(std::wstring paragraph)
-{
-    // 根据GPT返回的内容，确定待安装的包列表
-    InstallList pack_list;
-    std::wstring package_name;
-    int pos_start = paragraph.find(L"安装") + 2;
-    while (pos_start < paragraph.size() && paragraph[pos_start] == L' '){
-        pos_start += 1;
-    }
-    bool is_eng_package_name = is_eng_number(paragraph[pos_start]);
-    bool is_next_package = true;
-    for (int pos = pos_start; pos < paragraph.size(); pos++){
-        if (is_eng_package_name){
-            if (is_eng_number(paragraph[pos])){
-                if (is_next_package){
-                    package_name += paragraph[pos];
-                }
-            }else{
-                if (package_name.size() != 0){
-                    pack_list.push_back(package_name);
-                    package_name.clear();
-                    is_next_package = false;
-                }
-                if (paragraph[pos] == L'和' ||
-                    paragraph[pos] == L'、' ||
-                    (pos <= paragraph.size() - 2 && paragraph[pos] == L'以' && paragraph[pos] == L'及')){
-                    is_next_package = true;
-                }
-                if (std::find(Puncs.begin(), Puncs.end(), paragraph[pos]) != Puncs.end()){
-                    break;
-                }
-            }
-        }else{
-            if (std::find(Puncs.begin(), Puncs.end(), paragraph[pos]) == Puncs.end()){
-                package_name += paragraph[pos];
-            }else{
-                pack_list = {package_name};
-                package_name.clear();
-                break;
-            }
-        }
-    }
-    if (package_name.size() != 0){
-        pack_list.push_back(package_name);
-    }
-    return pack_list;
 }
 
 ReplaceList AnswerParser::check_replace(std::wstring raw_command, std::wstring dscp)
@@ -592,117 +323,56 @@ std::wstring AnswerParser::replace_command(std::wstring raw_command, ConfirmRepl
     return command;
 }
 
-int AnswerParser::find_not_check_ed_dx(std::vector<Section> sections)
+std::tuple<bool, std::vector<Opt>, ReplaceList> AnswerParser::parse_install_opt(std::wstring paragraph, ConfirmReplaceRes replace_res)
 {
-    if (sections.empty()){
-        return 0;
-    }
-    int not_check_ed_dx = sections.size();
-    for (int t = sections.size() - 1; t >= 0; t--){
-        if (sections[t].is_code == true && t != 0 && sections[t - 1].is_code == false){
-            bool is_check = false;
-            std::vector<std::wstring> verify_keywords = {L"验证", L"校验", L"检查", L"验证", L"测试", L"等待"};
-            for (auto it = verify_keywords.begin(); it != verify_keywords.end(); it++){
-                if (sections[t - 1].content.find(*it) != std::wstring::npos && sections[t - 1].content.find(*it) <= 10){
-                    not_check_ed_dx = t - 1;
-                    is_check = true;
-                    break;
-                }
-            }
-            if (!is_check){
+    std::vector<Opt> opt_list;
+    ReplaceList confirm_replace_list;
+
+    // 1.将GPT返回的内容拆分出区段
+    std::vector<Section> sections = split_sections(paragraph);
+
+    int installed_flag = Unconfirm;
+    for (int section_it = 0; section_it < sections.size(); section_it++){
+        // 2.如果GPT返回的内容是“检查XXX是否已安装”，那么提前执行这条指令
+        std::vector<std::wstring> verify_keywords = {L"验证", L"校验", L"检查", L"测试"};
+        bool is_confirm = false;
+        for (auto it = verify_keywords.begin(); it != verify_keywords.end(); it++){
+            if (sections[section_it].aim.find(*it) != std::wstring::npos){
+                is_confirm = true;
                 break;
             }
         }
-    }
-    return not_check_ed_dx;
-}
-
-std::tuple<bool, std::vector<Opt>, NeedConfirm> AnswerParser::parse_install_opt(std::wstring paragraph2, ConfirmReplaceRes replace_res)
-{
-    std::wstring paragraph = remove_example(paragraph2);
-    // 1.先确认要安装的内容
-    InstallList pack_list = get_package_list(paragraph);
-    std::vector<bool> is_installed_list(pack_list.size(), false);
-    Opt empty_opt(0, L"", L"");
-    // 2.如果GPT提示要安装的包不是最终的安装结果，则检查待安装的内容是否已经安装了。如果已经安装了，则不需要重复安装。如果没有安装，则确认一下
-    InstallList need_confirm_list;
-    for (int t = 0; t < pack_list.size(); t++){
-        std::wstring pack_name = pack_list[t];
-        if (install_package.has_value() && _wcsicmp(pack_name.c_str(), install_package.value().c_str()) != 0){
-            if (std::find_if(packages_to_download.begin(), packages_to_download.end(), [&pack_name](std::wstring x){
-                return bool(_wcsicmp(pack_name.c_str(), x.c_str()) == 0);
-            }) == packages_to_download.end()){
-                int confirm_res = is_confirm_install(pack_name);
-                if (is_installed(pack_name) || confirm_res == 2){
-                    // 已经安装过，或已被确认安装过，则不需要重复安装
-                    is_installed_list[t] = true;
-                }else if (confirm_res == 0){
-                    // 未被安装过，且未被确认安装过安装，则应当确认是否已安装
-                    need_confirm_list.push_back(pack_name);
-                }else{
-                    // 未被安装过，且已被确认过没安装，则应该安装
-                }
-            }
-        }
-    }
-
-    std::function<bool(std::vector<bool>)> all = [](std::vector<bool> v){
-        for (int t = 0; t < v.size(); t++){
-            if (v[t] == false){
-                return false;
-            }
-        }
-        return true;
-    };
-    if (all(is_installed_list) || need_confirm_list.size() != 0){
-        // 如果已经全部安装过了，或者有仍需确认安装的内容，则返回，不执行后面的安装指令
-        return std::tuple<bool, std::vector<Opt>, NeedConfirm>{true, {empty_opt}, need_confirm_list};
-    }
-    // 3.如果GPT提示要安装的包就是最终的安装结果，或者是下载的内容，则解析安装命令。如果没法解析出安装命令，则返回错误
-    if (paragraph.find(L"```") == std::wstring::npos){
-        return std::tuple<bool, std::vector<Opt>, NeedConfirm>{false, {empty_opt}, need_confirm_list};
-    }
-    std::vector<Section> sections = split_sections(paragraph);
-    int not_check_ed_dx = find_not_check_ed_dx(sections);
-    // 4.检查是否存在需要确认替换的内容
-    std::vector<Opt> opt_list;
-    ReplaceList confirm_replace_list;
-    for (int t = 0; t < not_check_ed_dx; t++){
-        if (sections[t].is_code == true){
-            // 进入这里，说明这段内容是一段代码
-            // 先解析这段命令是否需要在powershell中执行。如果是的话，调整命令内容
-            bool is_powershell = false;
-            if (t != 0 && sections[t - 1].is_code == false && boost::to_lower_copy(sections[t - 1].content).find(L"powershell") != std::wstring::npos){
-                is_powershell = true;
-            }
-            if (boost::istarts_with(sections[t].code_mark, L"powershell")){
-                is_powershell = true;
-            }
-            std::wstring command;
-            if (is_powershell){
-                command = convert_to_powershell(sections[t].content);
+        if (is_confirm){
+            std::wstring command = handle_powershell(sections[section_it].content, sections[section_it].loc);
+            if (is_installed(command)){
+                installed_flag = Installed;
             }else{
-                command = sections[t].content;
+                installed_flag = NotInstalled;
             }
-            // 再检查这段命令是直接执行，还是需要进行替换确认
-            ReplaceList confirm_replace;
-            if (t < sections.size() - 1 && sections[t + 1].is_code == false){
-                confirm_replace = check_replace(command, sections[t + 1].content);
-            }
-            if (confirm_replace.empty()){
-                // 没有需要替换的内容，说明已经得到最终的命令了
-                Opt opt(Install, L"", command);
-                opt_list.push_back(opt);
-            }else{
-                // 有需要替换的内容，需要进一步确认如何替换。但如果已经确认过了就可以直接返回
-                if (!replace_res.names.empty()){
-                    std::wstring command2 = replace_command(command, replace_res);
-                    Opt opt(Install, L"", command2);
+        }else{
+            // 3.如果确定是安装命令，且对应的包并未安装，则需要执行命令。
+            if (installed_flag != Installed){
+                // 如果这条指令的“说明”内容中有需要替换的内容，则需要确认替换，再执行。否则可以直接执行。
+                ReplaceList confirm_replace;
+                confirm_replace = check_replace(sections[section_it].content, sections[section_it].mark);
+                if (confirm_replace.empty()){
+                    // 没有需要替换的内容，说明已经得到最终的命令了
+                    std::wstring command = handle_powershell(sections[section_it].content, sections[section_it].loc);
+                    Opt opt(Install, L"", command);
                     opt_list.push_back(opt);
                 }else{
-                    confirm_replace_list.insert(confirm_replace_list.end(), confirm_replace.begin(), confirm_replace.end());
+                    // 有需要替换的内容，需要进一步确认如何替换。但如果已经确认过了就可以直接返回
+                    if (!replace_res.names.empty()){
+                        std::wstring raw_command = replace_command(sections[section_it].content, replace_res);
+                        std::wstring command = handle_powershell(raw_command, sections[section_it].loc);
+                        Opt opt(Install, L"", command);
+                        opt_list.push_back(opt);
+                    }else{
+                        confirm_replace_list.insert(confirm_replace_list.end(), confirm_replace.begin(), confirm_replace.end());
+                    }
                 }
             }
+            installed_flag = Unconfirm;
         }
     }
     return std::tuple<bool, std::vector<Opt>, ReplaceList>{true, opt_list, confirm_replace_list};
@@ -711,14 +381,32 @@ std::tuple<bool, std::vector<Opt>, NeedConfirm> AnswerParser::parse_install_opt(
 std::vector<AnswerParser::Section> AnswerParser::split_sections(std::wstring paragraph)
 {
     // 将GPT返回的一条指令，进一步拆分成若干个小区段
-    // 例如：paragraph是 创建文件，输入\n```rm -fr /```，就应当拆分成 {<创建文件，不是代码>，<rm -fr /，是代码>}
+    // 例如：命令的目的是验证python是否已安装，执行位置是cmd，命令内容是python --version
 
     std::vector<std::wstring> raw_sections;
     std::vector<Section> sections;
     boost::split_regex(raw_sections, paragraph, boost::wregex(L"\n"));
     bool is_code = false;
-    std::wstring code_mark;
-    std::wstring code_str;
+    Section curr_section;
+
+    std::function<void()> add_useful_section = [&sections, &curr_section](){
+        // 如果当前段落已经解析出命令内容了，则将其添加到最终的命令列表中
+        if (!curr_section.content.empty()){
+            if (sections.size() >= 1){
+                int last_dx = sections.size() - 1;
+                if (curr_section.aim.empty()){
+                    curr_section.aim = sections[last_dx].aim;
+                }
+                if (curr_section.loc.empty()){
+                    curr_section.loc = sections[last_dx].loc;
+                }
+                curr_section.mark = sections[last_dx].mark;
+            }
+            sections.push_back(curr_section);
+            curr_section = Section();
+        }
+    };
+
     for (int t = 0; t < raw_sections.size(); t++){
         // 不处理空行
         if (raw_sections[t].empty()){
@@ -731,35 +419,49 @@ std::vector<AnswerParser::Section> AnswerParser::split_sections(std::wstring par
             if (boost::ends_with(section_str, L"```")){
                 int end_dx = section_str.rfind(L"```");
                 if (end_dx != 0){
-                    code_str.append(L"\n");
-                    code_str.append(section_str.substr(0, end_dx));
+                    curr_section.content.append(L"\n");
+                    curr_section.content.append(section_str.substr(0, end_dx));
                 }
-                code_str = trim_n(code_str);
-                sections.push_back({code_str, true, code_mark});
+                curr_section.content = trim_n(curr_section.content);
                 is_code = false;
-                code_str.clear();
             }else{
-                code_str.append(L"\n");
-                code_str.append(raw_sections[t]);
+                curr_section.content.append(L"\n");
+                curr_section.content.append(raw_sections[t]);
             }
         }else{
             // 如果当前区段不在代码段中
+            // 先检查这一区段是否存在代码
             std::wstring section_str = trim_n(raw_sections[t]);
+            std::wstring section_sp_str = trim_n_spechar(raw_sections[t]);
+            std::wstring first_sentence = get_first_sentence(section_sp_str);
             bool is_code_begin = boost::starts_with(section_str, L"```");
             bool is_code_end = boost::ends_with(section_str, L"```");
             if (is_code_begin && is_code_end && section_str.size() >= 7){
-                std::wstring code_str2 = section_str.substr(3, section_str.size() - 6);
-                code_str2 = trim_n(code_str2);
-                sections.push_back({code_str2, true, L""});
+                add_useful_section();
+                curr_section.content = section_str.substr(3, section_str.size() - 6);
+                curr_section.content = trim_n(curr_section.content);
             }else if (is_code_begin){
+                add_useful_section();
                 int st_dx = section_str.find(L"```") + 3;
-                code_mark = section_str.substr(st_dx, section_str.size() - st_dx);
+                curr_section.content = section_str.substr(st_dx, section_str.size() - st_dx);
                 is_code = true;
             }else{
-                sections.push_back({raw_sections[t], false, L""});
+                // 再检查这一区段是否代表了代码的目的、地址、说明
+                if (first_sentence.find(L"目的") != std::wstring::npos){
+                    add_useful_section();
+                    curr_section.aim = trim_n_spechar(section_sp_str);
+                }else if (first_sentence.find(L"地址") != std::wstring::npos){
+                    add_useful_section();
+                    curr_section.loc = trim_n_spechar(section_sp_str);
+                }else if (first_sentence.find(L"说明") != std::wstring::npos){
+                    curr_section.mark = trim_n_spechar(section_sp_str);
+                }
             }
         }
     }
+    // 如果有尚未添加的区段，将其添加进去
+    add_useful_section();
+
     return sections;
 }
 
@@ -851,6 +553,25 @@ std::wstring AnswerParser::replace_path(std::wstring confirm_msg, ConfirmPathRes
     return L"";
 }
 
+std::wstring AnswerParser::handle_powershell(std::wstring raw_command, std::wstring exec_path)
+{
+    bool need_powershell = false;
+    bool has_powershell = false;
+    if (boost::to_lower_copy(raw_command).find(L"powershell") != std::wstring::npos){
+        has_powershell = true;
+    }
+    if (boost::to_lower_copy(exec_path).find(L"powershell") != std::wstring::npos){
+        need_powershell = true;
+    }
+    std::wstring command;
+    if (need_powershell && (!has_powershell)){
+        command = convert_to_powershell(raw_command);
+    }else{
+        command = raw_command;
+    }
+    return command;
+}
+
 std::wstring AnswerParser::convert_to_powershell(std::wstring raw_command)
 {
     // 对于需要转换成powershell的形式的指令，进行处理
@@ -866,85 +587,67 @@ std::wstring AnswerParser::convert_to_powershell(std::wstring raw_command)
     return command;
 }
 
-std::tuple<std::vector<Opt>, PathList, ReplaceList> AnswerParser::parse_exec_opt(std::wstring paragraph2, ConfirmPathRes path_res, ConfirmReplaceRes replace_res)
+std::tuple<std::vector<Opt>, PathList, ReplaceList> AnswerParser::parse_exec_opt(std::wstring paragraph, ConfirmPathRes path_res, ConfirmReplaceRes replace_res)
 {
-    std::wstring paragraph = remove_example(paragraph2);
-
     std::vector<Opt> opt_list;
     PathList confirm_path_list;
     ReplaceList confirm_replace_list;
 
-    // 1.解析出需要执行的命令，以及命令对应的上下文
+    // 1.将GPT返回的内容拆分出区段
     std::vector<Section> sections = split_sections(paragraph);
-    int not_check_ed_dx = find_not_check_ed_dx(sections);
 
-    for (int t = 0; t < not_check_ed_dx; t++){
-        if (sections[t].is_code == true){
-            // 进入这里，说明这段内容是一段代码
-            // 2.解析这个命令应该在哪里执行，是打开一个文件还是在命令行
-            std::wstring exec_pth = L"";
-            std::wstring exec_pth_confirm = L"";
-            if (t != 0 && sections[t - 1].is_code == false){
-                std::tuple<std::wstring, std::wstring> exec_path = get_exec_path(sections[t - 1].content);
-                exec_pth = std::get<0>(exec_path);
-                exec_pth_confirm = std::get<1>(exec_path);
-            }
-            // 3.解析这个命令中有没有需要替换的内容。
-            ReplaceList confirm_replace;
-            if (t < sections.size() - 1 && sections[t + 1].is_code == false){
-                confirm_replace = check_replace(sections[t].content, sections[t + 1].content);
-            }
-            // 4.解析这段命令是否需要在powershell中执行。如果是的话，调整命令内容
-            bool is_powershell = false;
-            if (t != 0 && sections[t - 1].is_code == false && boost::to_lower_copy(sections[t - 1].content).find(L"powershell") != std::wstring::npos){
-                is_powershell = true;
-            }
-            if (boost::istarts_with(sections[t].code_mark, L"powershell")){
-                is_powershell = true;
-            }
-            std::wstring command;
-            if (is_powershell){
-                command = convert_to_powershell(sections[t].content);
+    for (int section_it = 0; section_it < sections.size(); section_it++){
+        // 2.解析这个命令应该在哪里执行，是打开一个文件，还是在命令行，还是powershell
+        std::wstring exec_pth = L"";
+        std::wstring exec_pth_confirm = L"";
+        std::tuple<std::wstring, std::wstring> exec_path = get_exec_path(sections[section_it].loc);
+        exec_pth = std::get<0>(exec_path);
+        exec_pth_confirm = std::get<1>(exec_path);
+        std::wstring raw_command = sections[section_it].content;
+        if (exec_pth_confirm.empty()){
+            // 没有需要进一步的内容，可以直接执行
+        }else{
+            // 如果有需要进一步确认的内容，则需要判断是否有需要进一步确认，还是直接替换即可
+            if (!path_res.names.empty()){
+                // 已经确认过这些要替换的内容了，不需要重新替换
+                exec_pth = replace_path(exec_pth_confirm, path_res);
             }else{
-                command = sections[t].content;
+                confirm_path_list.push_back(std::make_pair(exec_pth, exec_pth_confirm));
             }
-            // 5.通过解析结果，分析这条命令可以直接执行，还是需要进一步确认
-            if (exec_pth_confirm.empty() && confirm_replace.empty()){
-                // 没有需要进一步的内容，可以直接执行
+        }
+        // 3.检查命令内容中是否有需要替换的内容。如果这条指令的“说明”内容中有需要替换的内容，则需要确认替换，再执行。否则可以直接执行。
+        ReplaceList confirm_replace;
+        confirm_replace = check_replace(raw_command, sections[section_it].mark);
+        if (confirm_replace.empty()){
+            // 没有需要替换的内容，说明已经得到最终的命令了
+        }else{
+            // 有需要替换的内容，需要进一步确认如何替换。但如果已经确认过了就可以直接返回
+            if (!replace_res.names.empty()){
+                raw_command = replace_command(raw_command, replace_res);
+            }else{
+                confirm_replace_list.insert(confirm_replace_list.end(), confirm_replace.begin(), confirm_replace.end());
+            }
+        }
+        // 4.正式插入命令。
+        // 如果确定是写入到一个文件中，那么就不需要检查是不是“powershell”了，否则需要进一步检查是cmd还是powershell。
+        std::wstring command;
+        if (sections[section_it].loc.find(L"文件") == std::wstring::npos){
+            command = handle_powershell(raw_command, sections[section_it].loc);
+        }else{
+            command = sections[section_it].content;
+        }
+        if (confirm_path_list.empty() && confirm_replace_list.empty()){
+            if (boost::starts_with(exec_pth, L"cd:")){
+                std::wstring cdname = exec_pth.substr(3, exec_pth.size() - 3);
+                std::wstring cd_cmd = L"cd /d ";
+                cd_cmd.append(cdname);
+                Opt opt1(Exec, L"", cd_cmd);
+                Opt opt2(Exec, L"", command);
+                opt_list.push_back(opt1);
+                opt_list.push_back(opt2);
+            }else{
                 Opt opt(Exec, exec_pth, command);
                 opt_list.push_back(opt);
-            }else{
-                bool path_need_confirm = false;
-                if (!exec_pth_confirm.empty()){
-                    if (!path_res.names.empty()){
-                        exec_pth = replace_path(exec_pth_confirm, path_res);
-                    }else{
-                        confirm_path_list.push_back(std::make_pair(exec_pth, exec_pth_confirm));
-                        path_need_confirm = true;
-                    }
-                }
-                if ((!confirm_replace.empty()) && (replace_res.names.empty())){
-                    confirm_replace_list.insert(confirm_replace_list.end(), confirm_replace.begin(), confirm_replace.end());
-                }else if (!path_need_confirm){
-                    std::wstring command2;
-                    if (replace_res.names.empty()){
-                        command2 = command;
-                    }else{
-                        command2 = replace_command(command, replace_res);
-                    }
-                    if (boost::starts_with(exec_pth, L"cd:")){
-                        std::wstring cdname = exec_pth.substr(3, exec_pth.size() - 3);
-                        std::wstring cd_cmd = L"cd /d ";
-                        cd_cmd.append(cdname);
-                        Opt opt1(Exec, L"", cd_cmd);
-                        Opt opt2(Exec, L"", command2);
-                        opt_list.push_back(opt1);
-                        opt_list.push_back(opt2);
-                    }else{
-                        Opt opt(Exec, exec_pth, command2);
-                        opt_list.push_back(opt);
-                    }
-                }
             }
         }
     }
@@ -1038,12 +741,12 @@ std::vector<Opt> AnswerParser::opt_process(std::vector<Opt> raw_opts)
 //                opt_new.command.append(dest_folder);
 //            }
             opt_list.push_back(opt_new);
-            if (opt_new.opt_type == Download && _wcsicmp(package_name.c_str(), L"vcpkg") == 0){
-                Opt opt_new2(Exec, L"", L"sed -i \"s/github.com/kgithub.com/g\" `grep -rl \"github.com\" ./vcpkg`");
-                opt_list.push_back(opt_new2);
-                Opt opt_new3(Exec, L"", L"sed -i \"s/raw.githubusercontent.com/raw.staticdn.net/g\" `grep -rl \"raw.githubusercontent.com\" ./vcpkg`");
-                opt_list.push_back(opt_new3);
-            }
+//            if (opt_new.opt_type == Download && _wcsicmp(package_name.c_str(), L"vcpkg") == 0){
+//                Opt opt_new2(Exec, L"", L"sed -i \"s/github.com/kgithub.com/g\" `grep -rl \"github.com\" ./vcpkg`");
+//                opt_list.push_back(opt_new2);
+//                Opt opt_new3(Exec, L"", L"sed -i \"s/raw.githubusercontent.com/raw.staticdn.net/g\" `grep -rl \"raw.githubusercontent.com\" ./vcpkg`");
+//                opt_list.push_back(opt_new3);
+//            }
             // 将下载后的路径添加进环境变量中
 //            std::wstring opt_new4_command = L"set PATH=";
 //            std::wstring abspath = boost::filesystem::absolute(dest_folder).wstring();
@@ -1054,14 +757,14 @@ std::vector<Opt> AnswerParser::opt_process(std::vector<Opt> raw_opts)
             continue;
         }
         // 将vcpkg替换为国内源
-        if (opt_new.opt_type == Download && _wcsicmp(get_last_word(opt_new.command).c_str(), L"vcpkg") == 0){
-            opt_list.push_back(opt_new);
-            Opt opt_new2(Exec, L"", L"sed -i \"s/github.com/kgithub.com/g\" `grep -rl \"github.com\" ./vcpkg`");
-            opt_list.push_back(opt_new2);
-            Opt opt_new3(Exec, L"", L"sed -i \"s/raw.githubusercontent.com/raw.staticdn.net/g\" `grep -rl \"raw.githubusercontent.com\" ./vcpkg`");
-            opt_list.push_back(opt_new3);
-            continue;
-        }
+//        if (opt_new.opt_type == Download && _wcsicmp(get_last_word(opt_new.command).c_str(), L"vcpkg") == 0){
+//            opt_list.push_back(opt_new);
+//            Opt opt_new2(Exec, L"", L"sed -i \"s/github.com/kgithub.com/g\" `grep -rl \"github.com\" ./vcpkg`");
+//            opt_list.push_back(opt_new2);
+//            Opt opt_new3(Exec, L"", L"sed -i \"s/raw.githubusercontent.com/raw.staticdn.net/g\" `grep -rl \"raw.githubusercontent.com\" ./vcpkg`");
+//            opt_list.push_back(opt_new3);
+//            continue;
+//        }
         // 将pip install替换为国内（清华）源
         if (opt_new.opt_type == Install && opt_new.command.find(L"pip install ") != std::wstring::npos && opt_new.command.find(L" -i ") == std::wstring::npos){
             opt_new.command.append(L" -i https://pypi.tuna.tsinghua.edu.cn/simple");

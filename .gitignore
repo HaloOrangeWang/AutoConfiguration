@@ -1,7 +1,9 @@
 .idea/
 __pycache__/
 AutoConfigServer/answers/
-TestServer/*.txt
+TestServer/*
+!TestServer/main.py
+!TestServer/test.py
 build-*
 nohup.out
 sensi_words.txt

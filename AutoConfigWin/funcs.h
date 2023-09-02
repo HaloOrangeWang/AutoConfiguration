@@ -119,6 +119,44 @@ inline std::wstring trim_n(std::wstring s)
     }
 }
 
+// 将一个字符串开头的空格、特殊字符，以及结尾的空格的空格、换行符去掉
+inline std::wstring trim_n_spechar(std::wstring s)
+{
+    int st_dx = -1;
+    int ed_dx = -1;
+    for (int t = 0; t < s.size(); t++){
+        if (is_eng_number(s[t]) || is_chn_chr(s[t])){
+            st_dx = t;
+            break;
+        }
+    }
+    for (int t = static_cast<int>(s.size()) - 1; t >= 0; t--){
+        if (s[t] != L'\n' && s[t] != L' '){
+            ed_dx = t;
+            break;
+        }
+    }
+    if (st_dx == -1 || ed_dx == -1){
+        return std::wstring();
+    }else{
+        return s.substr(st_dx, ed_dx - st_dx + 1);
+    }
+}
+
+// 获取一段话中的第一个句子，以中文标点符号或换行符作为第一句的结尾。但是
+inline std::wstring get_first_sentence(std::wstring s)
+{
+    std::wstring sentence;
+    for (int t = 0; t < s.size(); t++){
+        if (std::find(Puncs.begin(), Puncs.end(), s[t]) != Puncs.end()){
+            break;
+        }else{
+            sentence.push_back(s[t]);
+        }
+    }
+    return sentence;
+}
+
 // 检查目标字符串是否在另一个大字符串中。如果在，则返回目标字符串，否则返回为空
 // 另注：如果目标字符串以标点符号作为开头结尾，但标点符号
 inline std::wstring find_in_command(std::wstring sentence, std::wstring target)
@@ -186,53 +224,15 @@ inline std::wstring get_last_word(std::wstring str)
     return str_output;
 }
 
-// 删除两个换行符之间的空格。将“\n    \n”修剪成“\n\n”
-inline std::wstring trim_between_n(std::wstring str)
-{
-    if (str.empty()){
-        return L"";
-    }
-    std::wstring str_output;
-    int str_dx = 0;
-    while (true){
-        str_output.push_back(str[str_dx]);
-        bool is_trim = false;
-        if (str[str_dx] == L'\n'){
-            for (int str_dx2 = str_dx + 1; str_dx2 < str.size(); str_dx2++){
-                if (str[str_dx2] != L'\n' && str[str_dx2] != L' '){
-                    break;
-                }
-                if (str[str_dx2] == L'\n'){
-                    str_dx = str_dx2;
-                    is_trim = true;
-                    break;
-                }
-            }
-        }
-        if (is_trim == true){
-            continue;
-        }
-        str_dx += 1;
-        if (str_dx == str.size()){
-            break;
-        }
-    }
-    return str_output;
-}
-
 // 将OptType转换为字符串
 inline std::wstring get_opt_type_str(int opt_type)
 {
     if (opt_type == Ignore){
         return L"不需要处理";
-    }else if (opt_type == Download){
-        return L"下载";
     }else if (opt_type == Install){
         return L"安装";
     }else if (opt_type == Exec){
         return L"执行命令";
-    }else if (opt_type == Verify){
-        return L"验证";
     }
     return L"未知";
 }

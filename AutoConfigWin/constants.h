@@ -5,21 +5,36 @@
 #include <vector>
 #include <boost/optional.hpp>
 
-const std::string ServerURL = "ws://43.133.10.205:58000/submit"; //向GPT提问的websocket地址
+const std::wstring VERSION = L"0.92"; //版本号
+
+//const std::string ServerURL = "ws://43.133.10.205:58000/submit"; //向GPT提问的websocket地址
 const std::string ReportURL = "http://43.133.10.205:58000/report"; //反馈bug和提出改进意见的地址
-//const std::string ServerURL = "ws://127.0.0.1:58000/submit";
+const std::string ServerURL = "ws://127.0.0.1:58000/submit";
 
 const std::vector<wchar_t> Puncs = {L'，', L'。', L'：', L'；', L'\n'}; //可用于断句的标点符号列表
 const std::vector<wchar_t> ChnQuotations = {L'‘', L'’', L'“', L'”'}; //中文引号列表
 
-enum OptType  //操作类型。1为下载，2为安装，3为执行命令，4为校验
+enum OptType  //操作类型。1为安装，2为执行命令（删掉下载类别，归入到“执行命令”中；删除“检查”类别）
 {
     Ignore = 0,
-    Download,
     Install,
     Exec,
-    Verify,
     Unmanageable
+};
+
+// 指令类型：安装或配置
+enum OrderType
+{
+    OrderInstall = 0,
+    OrderConfig
+};
+
+// 是否允许容器和虚拟环境
+enum VenvOption
+{
+    VenvForbid = 0,
+    VenvAllow,
+    VenvCommand
 };
 
 struct Opt  //一条操作指令

@@ -98,7 +98,8 @@ void GptComm::on_message(Client* c, websocketpp::connection_hdl hdl, Client::mes
 {
     qDebug() << "收到了Websocket返回的信息";
     // 1.先判断是否正确接收到答案了
-    std::string answer;
+    std::string origin_answer;
+    std::string check_answer;
     if (msg->get_opcode() == websocketpp::frame::opcode::text){
         std::string raw_msg = msg->get_payload();
         rapidjson::Document document;
@@ -117,19 +118,21 @@ void GptComm::on_message(Client* c, websocketpp::connection_hdl hdl, Client::mes
             emit_err_msg(ServerError, c, hdl);
             return;
         }
-        if ((!document.HasMember("answer")) || (!document["answer"].IsString())){
+        if ((!document.HasMember("origin_answer")) || (!document["origin_answer"].IsString()) || (!document.HasMember("check_answer")) || (!document["check_answer"].IsString())){
             emit_err_msg(ServerError, c, hdl);
             return;
         }
-        answer = document["answer"].GetString();
+        origin_answer = document["origin_answer"].GetString();
+        check_answer = document["check_answer"].GetString();
     }else{
         emit_err_msg(WebSocketError, c, hdl);
         return;
     }
 
     // 2.分析问题的答案
-    std::wstring answer_ws = UTF8ToUnicode(answer);
-    emit ReturnAnswer(answer_ws);
+    std::wstring origin_answer_ws = UTF8ToUnicode(origin_answer);
+    std::wstring check_answer_ws = UTF8ToUnicode(check_answer);
+    emit ReturnAnswer(origin_answer_ws, check_answer_ws);
 }
 
 GptComm::~GptComm()

@@ -1,33 +1,49 @@
 ﻿#pragma execution_character_set("utf-8")
 
 #include "question.h"
+#include "constants.h"
+#include <boost/property_tree/ptree.hpp>
+#include <boost/property_tree/json_parser.hpp>
 
-std::wstring QuestionInstall::format_question()
+std::wstring format_install_question(std::wstring env_os, std::vector<std::pair<std::wstring, std::wstring>> env_sw, std::wstring package, int venv_option)
 {
-    std::wstring output;
-    output = L"在";
-    output.append(env_os);
+    boost::property_tree::wptree root, env_sw_2;
+
+    root.put(L"env_os", env_os);
     for (int t = 0; t < env_sw.size(); t++){
-        output.append(L"，");
-        output.append(env_sw[t].first);
+        boost::property_tree::wptree env_sw_3;
+        env_sw_3.put(L"", env_sw[t].first);
+        env_sw_2.push_back(std::make_pair(L"", env_sw_3));
     }
-    output.append(L"环境下，使用命令行安装");
-    output.append(software_name);
-    output.append(L"。\n\n1. 最好使用一种包版本管理工具\n\n2. 请明确给出每一步操作需要输入的的命令，不需要举例子。\n\n3. 完成后不需要使用它，也不需要验证安装结果。");
-    return output;
+    root.add_child(L"env_sw", env_sw_2);
+    root.put(L"type", OrderInstall);
+    root.put(L"package", package);
+    root.put(L"venv_option", venv_option);
+    root.put(L"version", VERSION);
+
+    std::wostringstream oss;
+    boost::property_tree::write_json(oss, root);
+    return oss.str();
 }
 
-std::wstring QuestionConfigure::format_question()
+std::wstring format_config_question(std::wstring env_os, std::vector<std::pair<std::wstring, std::wstring>> env_sw, std::wstring package, std::wstring description, int venv_option)
 {
-    std::wstring output;
-    output = L"在";
-    output += env_os;
+    boost::property_tree::wptree root, env_sw_2;
+
+    root.put(L"env_os", env_os);
     for (int t = 0; t < env_sw.size(); t++){
-        output.append(L"，");
-        output.append(env_sw[t].first);
+        boost::property_tree::wptree env_sw_3;
+        env_sw_3.put(L"", env_sw[t].first);
+        env_sw_2.push_back(std::make_pair(L"", env_sw_3));
     }
-    output.append(L"环境下，使用命令行配置");
-    output.append(software_name);
-    output.append(description);
-    return output;
+    root.add_child(L"env_sw", env_sw_2);
+    root.put(L"type", OrderConfig);
+    root.put(L"package", package);
+    root.put(L"description", description);
+    root.put(L"venv_option", venv_option);
+    root.put(L"version", VERSION);
+
+    std::wostringstream oss;
+    boost::property_tree::write_json(oss, root);
+    return oss.str();
 }

@@ -30,7 +30,7 @@ public:
 
 signals:
     void ReturnErrorMsg(int error_id); //如果向GPT发送提问请求的过程出现异常，则返回这个信号
-    void ReturnAnswer(std::wstring answer2); //返回答案后通过这个函数通知主线程
+    void ReturnAnswer(std::wstring origin_answer, std::wstring check_answer); //返回答案后通过这个函数通知主线程
 
 private:
     int connect_server(); //连接websocket服务器

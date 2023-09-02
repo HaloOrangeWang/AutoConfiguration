@@ -39,6 +39,7 @@ SOURCES += \
     answer_parser.cpp \
     cmdexec.cpp \
     constants.cpp \
+    frontend/advopdialog.cpp \
     frontend/cinstallwindow.cpp \
     frontend/cmdlistview.cpp \
     frontend/cpathwindow.cpp \
@@ -52,6 +53,7 @@ HEADERS += \
     answer_parser.h \
     cmdexec.h \
     constants.h \
+    frontend/advopdialog.h \
     frontend/cinstallwindow.h \
     frontend/cmdlistview.h \
     frontend/cpathwindow.h \
@@ -62,6 +64,7 @@ HEADERS += \
     question.h
 
 FORMS += \
+    frontend/advopdialog.ui \
     frontend/cinstallwindow.ui \
     frontend/cpathwindow.ui \
     frontend/creplacewindow.ui \

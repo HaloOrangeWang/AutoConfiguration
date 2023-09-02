@@ -66,8 +66,14 @@ void MainWindow::init_graphics()
     connect(ui->button_addcmd, SIGNAL(clicked()), cmd_list_view.get(), SLOT(add_newcmd()));
     connect(ui->button_cmdexec, SIGNAL(clicked()), this, SLOT(exec()));
 
+    // 绑定“高级选项”相关的按钮点击事件
+    connect(ui->pushButton_MoreOp1, SIGNAL(clicked()), this, SLOT(on_show_adv_op()));
+    connect(ui->pushButton_MoreOp2, SIGNAL(clicked()), this, SLOT(on_show_adv_op()));
+    connect(adv_op_dialog.button_yes, SIGNAL(clicked()), this, SLOT(on_confirm_adv_op()));
+    connect(adv_op_dialog.button_no, SIGNAL(clicked()), this, SLOT(on_giveup_adv_op()));
+
     // 绑定从GPT接收消息的事件
-    connect(gpt_comm, SIGNAL(ReturnAnswer(std::wstring)), this, SLOT(on_answer(std::wstring)));
+    connect(gpt_comm, SIGNAL(ReturnAnswer(std::wstring, std::wstring)), this, SLOT(on_answer(std::wstring, std::wstring)));
     connect(gpt_comm, SIGNAL(ReturnErrorMsg(int)), this, SLOT(on_error_msg(int)));
 
     // 绑定命令行执行结果的事件
@@ -106,6 +112,38 @@ void MainWindow::on_add_env_line()
     num_env_line += 1;
 }
 
+void MainWindow::on_show_adv_op()
+{
+    ui->pushButton_Install->setEnabled(false);
+    ui->pushButton_Conf->setEnabled(false);
+    adv_op_dialog.set_init_value(venv_option);
+    adv_op_dialog.show();
+}
+
+void MainWindow::on_confirm_adv_op()
+{
+    // 确定“是否启用容器和虚拟环境”的标志
+    if (adv_op_dialog.radio_button_1->isChecked()){
+        venv_option = VenvForbid;
+    }else if (adv_op_dialog.radio_button_2->isChecked()){
+        venv_option = VenvAllow;
+    }else if (adv_op_dialog.radio_button_3->isChecked()){
+        venv_option = VenvCommand;
+    }
+    // 关闭“高级选项”窗口
+    ui->pushButton_Install->setEnabled(true);
+    ui->pushButton_Conf->setEnabled(true);
+    adv_op_dialog.close();
+}
+
+void MainWindow::on_giveup_adv_op()
+{
+    // 关闭“高级选项”窗口
+    ui->pushButton_Install->setEnabled(true);
+    ui->pushButton_Conf->setEnabled(true);
+    adv_op_dialog.close();
+}
+
 void MainWindow::submit_install_question()
 {
     std::wstring env_os = ui->lineEdit_OS->text().toStdWString();
@@ -126,8 +164,7 @@ void MainWindow::submit_install_question()
         QMessageBox::about(this, "Hint", QString::fromStdWString(L"需要输入要安装的软件名"));
         return;
     }
-    question = new QuestionInstall(env_os, env_sw, software_name);
-    std::wstring question_str = question->format_question();
+    std::wstring question_str = format_install_question(env_os, env_sw, software_name, venv_option);
     input_os = env_os;
     package_to_install = software_name;
     status = Downloading;
@@ -159,8 +196,7 @@ void MainWindow::submit_config_question()
         QMessageBox::about(this, "Hint", QString::fromStdWString(L"需要输入要配置的软件名及配置方法"));
         return;
     }
-    question = new QuestionConfigure(env_os, env_sw, software_name, software_path, description);
-    std::wstring question_str = question->format_question();
+    std::wstring question_str = format_config_question(env_os, env_sw, software_name, description, venv_option);
     input_os = env_os;
     package_to_install = boost::none;
     status = Downloading;
@@ -187,7 +223,7 @@ void MainWindow::connect_parser_signals()
     connect(parse_answer.get(), SIGNAL(ConfirmInstall(InstallList, std::wstring)), this, SLOT(on_need_confirm_install(InstallList, std::wstring)));
     connect(parse_answer.get(), SIGNAL(ConfirmReplace(ReplaceList, std::wstring)), this, SLOT(on_need_confirm_replace(ReplaceList, std::wstring)));
     connect(parse_answer.get(), SIGNAL(ConfirmPath(PathList, ReplaceList, std::wstring)), this, SLOT(on_need_confirm_path(PathList, ReplaceList, std::wstring)));
-    connect(parse_answer.get(), SIGNAL(ParseSuccess(std::vector<Opt>, std::wstring)), this, SLOT(on_parse_success(std::vector<Opt>, std::wstring)));
+    connect(parse_answer.get(), SIGNAL(ParseSuccess(std::vector<Opt>)), this, SLOT(on_parse_success(std::vector<Opt>)));
 }
 
 void MainWindow::on_need_next_question(std::wstring question)
@@ -262,12 +298,11 @@ void MainWindow::on_confirm_path(ConfirmPathRes path_res, ConfirmReplaceRes repl
     parse_answer->on_confirm_path(path_res, replace_res);
 }
 
-void MainWindow::on_parse_success(std::vector<Opt> opt_list, std::wstring raw_answer)
+void MainWindow::on_parse_success(std::vector<Opt> opt_list)
 {
     status = PrepareExecute;
     //解析GPT返回结果全部成功后的调用内容
     //将解析结果展示在界面上
-    raw_answer_ws = raw_answer;
     cmd_list_view->init(opt_list);
     cmd_list_view->show();
     //在界面上展示“未解析出命令”的段落列表
@@ -335,7 +370,7 @@ void MainWindow::exec()
     status = Execute;
 }
 
-void MainWindow::on_answer(std::wstring message)
+void MainWindow::on_answer(std::wstring origin_answer, std::wstring check_answer)
 {
     qDebug() << "已收到GPT返回的答案";
     if (parse_answer == nullptr){
@@ -344,13 +379,11 @@ void MainWindow::on_answer(std::wstring message)
         parse_answer = std::make_unique<AnswerParser>(input_os, package_to_install, cmd_exec);
         connect_parser_signals();
 
-        //answer_ws.assign(answer.begin(), answer.end());
         status = Parsing;
-        parse_answer->parse_first_answer(message);
-        raw_answer_ws = message;
+        parse_answer->parse_first_answer(origin_answer, check_answer);
+        raw_answer_ws = origin_answer;
     }else{
-        // 不是此次配置的第一个问题，使用现有的AnswerParser
-        parse_answer->parse_second_answer(message);
+        //0.92版本没有连续向GPT提问的场景，因此无需处理“不是第一个问题”的情况
     }
 }
 

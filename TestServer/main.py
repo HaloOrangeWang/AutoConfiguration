@@ -24,16 +24,14 @@ class MainServer(tornado.websocket.WebSocketHandler):
 
     async def on_message(self, message):
         """处理客户端发来的消息。依次将消息解码、保存并发送给GPT"""
-        # 1.现将消息解码
-        if self.question_id == 0:
-            with open("0007.txt", "r", encoding="utf8") as f:
-                rtn_message = f.read()
-        else:
-            with open("0007.txt", "r", encoding="utf8") as f:
-                rtn_message = f.read()
+        # 1.先将消息解码
+        with open("git_ssh/conf.txt", "r", encoding="utf8") as f:
+            rtn_message = f.read()
+        with open("git_ssh/check.txt", "r", encoding="utf8") as f:
+            check_message = f.read()
         self.question_id += 1
 
-        rtn_msg = json.dumps({"err_code": ErrorCode.Success, "answer": rtn_message})
+        rtn_msg = json.dumps({"err_code": ErrorCode.Success, "origin_answer": rtn_message, "check_answer": check_message})
         await self.write_message(rtn_msg.encode("utf8"))
 
     def on_close(self):
